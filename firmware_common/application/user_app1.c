@@ -38,6 +38,7 @@ PROTECTED FUNCTIONS
 **********************************************************************************************************************/
 
 #include "configuration.h"
+#include <lcd_NHD-C12864LZ.h>
 
 /***********************************************************************************************************************
 Global variable definitions with scope across entire project.
@@ -61,6 +62,7 @@ Variable names shall start with "UserApp1_<type>" and be declared as static.
 ***********************************************************************************************************************/
 static fnCode_type UserApp1_pfStateMachine;               /*!< @brief The state machine function pointer */
 //static u32 UserApp1_u32Timeout;                           /*!< @brief Timeout counter used across states */
+int UserApp1_au8Name[];
 
 
 /**********************************************************************************************************************
@@ -74,6 +76,31 @@ Function Definitions
 /*--------------------------------------------------------------------------------------------------------------------*/
 /*! @protectedsection */                                                                                            
 /*--------------------------------------------------------------------------------------------------------------------*/
+
+void draw_board() {
+    int board_pixel_dimensions = 57;
+    int left_border_pixel_col = 32;
+    int bottom_border_pixel_row = 3;
+
+    PixelAddressType sTargetPixel = {0, 0};
+    for (int i = 0; i < 9; i++) {
+        // Draw column
+        int file_left_pixel_col = left_border_pixel_col + (i * 7);
+        sTargetPixel.u16PixelColumnAddress = file_left_pixel_col;
+        for (int j = bottom_border_pixel_row; j < board_pixel_dimensions + bottom_border_pixel_row; j++) {
+            sTargetPixel.u16PixelRowAddress = j;
+            LcdSetPixel(&sTargetPixel);
+        }
+
+        // Draw row
+        int rank_bottom_pixel_row = bottom_border_pixel_row + (i * 7);
+        sTargetPixel.u16PixelRowAddress = rank_bottom_pixel_row;
+        for (int j = 0; j < board_pixel_dimensions; j++) {
+            sTargetPixel.u16PixelColumnAddress = left_border_pixel_col + j;
+            LcdSetPixel(&sTargetPixel);
+        }
+    }
+}
 
 /*!--------------------------------------------------------------------------------------------------------------------
 @fn void UserApp1Initialize(void)
@@ -96,6 +123,8 @@ void UserApp1Initialize(void)
   if( 1 )
   {
     UserApp1_pfStateMachine = UserApp1SM_Idle;
+    LcdClearScreen();
+    draw_board();
   }
   else
   {
