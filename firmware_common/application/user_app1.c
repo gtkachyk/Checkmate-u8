@@ -40,6 +40,13 @@ PROTECTED FUNCTIONS
 #include "configuration.h"
 #include <lcd_NHD-C12864LZ.h>
 
+// Constants
+int DEFAULT_DISPLAY_BOARD_SQUARE_SIZE = 7;
+int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_ROW = 59;
+int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_COL = 32;
+int DEFAULT_DISPLAY_BOARD_ROW_WRITE_DIRECTION = -1;
+int DEFAULT_DISPLAY_BOARD_COL_WRITE_DIRECTION = 1;
+
 /***********************************************************************************************************************
 Global variable definitions with scope across entire project.
 All Global variable names shall start with "G_<type>UserApp1"
@@ -77,27 +84,44 @@ Function Definitions
 /*! @protectedsection */                                                                                            
 /*--------------------------------------------------------------------------------------------------------------------*/
 
-void draw_board() {
-    int board_pixel_dimensions = 57;
-    int left_border_pixel_col = 32;
-    int bottom_border_pixel_row = 3;
+void draw_line(int start_row, int start_col, int length, int row_increment, int col_increment) {
+    PixelAddressType sTargetPixel = {start_row, start_col};
+    for (int i = 0; i < length; i++) {
+        LcdSetPixel(&sTargetPixel);
+        sTargetPixel.u16PixelRowAddress += row_increment;
+        sTargetPixel.u16PixelColumnAddress += col_increment;
+    }
+}
 
-    PixelAddressType sTargetPixel = {0, 0};
-    for (int i = 0; i < 9; i++) {
-        // Draw column
-        int file_left_pixel_col = left_border_pixel_col + (i * 7);
-        sTargetPixel.u16PixelColumnAddress = file_left_pixel_col;
-        for (int j = bottom_border_pixel_row; j < board_pixel_dimensions + bottom_border_pixel_row; j++) {
-            sTargetPixel.u16PixelRowAddress = j;
-            LcdSetPixel(&sTargetPixel);
-        }
+void colour_square(int square_pixel_dimensions, int bottom_left_pixel_row, int bottom_left_pixel_col, int row_write_direction, int col_write_direction) {
+    for (int i = 0; i < square_pixel_dimensions; i++) {
+        int row = bottom_left_pixel_row + (i * row_write_direction);
+        draw_line(row, bottom_left_pixel_col, square_pixel_dimensions, 0, col_write_direction);
+    }
+}
 
-        // Draw row
-        int rank_bottom_pixel_row = bottom_border_pixel_row + (i * 7);
-        sTargetPixel.u16PixelRowAddress = rank_bottom_pixel_row;
-        for (int j = 0; j < board_pixel_dimensions; j++) {
-            sTargetPixel.u16PixelColumnAddress = left_border_pixel_col + j;
-            LcdSetPixel(&sTargetPixel);
+void draw_board(int square_pixel_dimensions, int bottom_left_pixel_row, int bottom_left_pixel_col, int row_write_direction, int col_write_direction) {
+    int board_pixel_dimensions = (square_pixel_dimensions * 8) + 1;
+    int outer_board_dimensions = board_pixel_dimensions + 1;
+    int top_row = bottom_left_pixel_row + (8 * square_pixel_dimensions * row_write_direction) + row_write_direction;
+    int bottom_row = bottom_left_pixel_row - row_write_direction;
+    int left_col = bottom_left_pixel_col - col_write_direction;
+    int right_col = bottom_left_pixel_col + (8 * square_pixel_dimensions * col_write_direction) + col_write_direction;
+    
+    // Draw border
+    draw_line(top_row + (1 * col_write_direction), left_col, outer_board_dimensions, 0, col_write_direction); // Top border
+    draw_line(bottom_row, left_col, outer_board_dimensions, 0, col_write_direction); // Bottom border
+    draw_line(bottom_row, left_col, outer_board_dimensions, row_write_direction, 0); // Left border
+    draw_line(bottom_row, right_col + (1 * row_write_direction), outer_board_dimensions, row_write_direction, 0); // Right border
+
+    // Colour squares
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 8; col++) {
+            if ((row + col) % 2 != 1) {
+                int square_row = bottom_left_pixel_row + (row * square_pixel_dimensions * row_write_direction);
+                int square_col = bottom_left_pixel_col + (col * square_pixel_dimensions * col_write_direction);
+                colour_square(square_pixel_dimensions, square_row, square_col, row_write_direction, col_write_direction);
+            }
         }
     }
 }
@@ -117,17 +141,14 @@ Promises:
 - NONE
 
 */
-void UserApp1Initialize(void)
-{
+void UserApp1Initialize(void) {
   /* If good initialization, set state to Idle */
-  if( 1 )
-  {
+  if(1) {
     UserApp1_pfStateMachine = UserApp1SM_Idle;
     LcdClearScreen();
-    draw_board();
+    draw_board(DEFAULT_DISPLAY_BOARD_SQUARE_SIZE, DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_ROW, DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_COL, DEFAULT_DISPLAY_BOARD_ROW_WRITE_DIRECTION, DEFAULT_DISPLAY_BOARD_COL_WRITE_DIRECTION);
   }
-  else
-  {
+  else {
     /* The task isn't properly initialized, so shut it down and don't run */
     UserApp1_pfStateMachine = UserApp1SM_Error;
   }
