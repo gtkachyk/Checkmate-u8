@@ -1,89 +1,57 @@
-/*!*********************************************************************************************************************
-@file user_app1.c                                                                
-@brief User's tasks / applications are written here.  This description
-should be replaced by something specific to the task.
-
-----------------------------------------------------------------------------------------------------------------------
-To start a new task using this user_app1 as a template:
- 1. Copy both user_app1.c and user_app1.h to the Application directory
- 2. Rename the files yournewtaskname.c and yournewtaskname.h
- 3. Add yournewtaskname.c and yournewtaskname.h to the Application Include and Source groups in the IAR project
- 4. Use ctrl-h (make sure "Match Case" is checked) to find and replace all instances of "user_app1" with "yournewtaskname"
- 5. Use ctrl-h to find and replace all instances of "UserApp1" with "YourNewTaskName"
- 6. Use ctrl-h to find and replace all instances of "USER_APP1" with "YOUR_NEW_TASK_NAME"
- 7. Add a call to YourNewTaskNameInitialize() in the init section of main
- 8. Add a call to YourNewTaskNameRunActiveState() in the Super Loop section of main
- 9. Update yournewtaskname.h per the instructions at the top of yournewtaskname.h
-10. Delete this text (between the dashed lines) and update the Description below to describe your task
-----------------------------------------------------------------------------------------------------------------------
-
-------------------------------------------------------------------------------------------------------------------------
-GLOBALS
-- NONE
-
-CONSTANTS
-- NONE
-
-TYPES
-- NONE
-
-PUBLIC FUNCTIONS
-- NONE
-
-PROTECTED FUNCTIONS
-- void UserApp1Initialize(void)
-- void UserApp1RunActiveState(void)
-
-
-**********************************************************************************************************************/
-
 #include "configuration.h"
 #include <lcd_NHD-C12864LZ.h>
+#include <mpgl2-ehdw-02.h>
 
+/* Not My Variables */
+// Global variable definitions with scope across entire project. All Global variable names shall start with "G_<type>UserApp1".
+// New Variables
+volatile u32 G_u32UserApp1Flags;
+
+// Existing variables (defined in other files -- should all contain the "extern" keyword).
+extern volatile u32 G_u32SystemTime1ms;
+extern volatile u32 G_u32SystemTime1s;
+extern volatile u32 G_u32SystemFlags;
+extern volatile u32 G_u32ApplicationFlags;
+
+// Global variable definitions with scope limited to this local application. Variable names shall start with "UserApp1_<type>" and be declared as static.
+static fnCode_type UserApp1_pfStateMachine;
+int UserApp1_au8Name[];
+
+/* My Variables */
 // Constants
 int DEFAULT_DISPLAY_BOARD_SQUARE_SIZE = 7;
 int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_ROW = 59;
-int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_COL = 32;
+int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_COL = 35;
 int DEFAULT_DISPLAY_BOARD_ROW_WRITE_DIRECTION = -1;
 int DEFAULT_DISPLAY_BOARD_COL_WRITE_DIRECTION = 1;
 
-/***********************************************************************************************************************
-Global variable definitions with scope across entire project.
-All Global variable names shall start with "G_<type>UserApp1"
-***********************************************************************************************************************/
-/* New variables */
-volatile u32 G_u32UserApp1Flags;                          /*!< @brief Global state flags */
+// Structs
+struct display_info {
+    int square_size;
+    int bottom_left_pixel_row;
+    int bottom_left_pixel_col;
+    int row_write_direction;
+    int col_write_direction;
+};
 
+// Game engine data
+struct display_info default_display = {7, 59, 35, -1, 1};
+static int game_state = 0;
+static int previous_result = 0;
+static int turn = 1;
+static int board[8][8] = {
+    {10, 8, 9, 11, 12, 9, 8, 10}, 
+    {7, 7, 7, 7, 7, 7, 7, 7}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {1, 1, 1, 1, 1, 1, 1, 1}, 
+    {4, 2, 3, 5, 6, 3, 2, 4}
+};
+int (*draw_piece_functions[13]) (int rank_pixel_coords, int file_pixel_coords, struct display_info display);
 
-/*--------------------------------------------------------------------------------------------------------------------*/
-/* Existing variables (defined in other files -- should all contain the "extern" keyword) */
-extern volatile u32 G_u32SystemTime1ms;                   /*!< @brief From main.c */
-extern volatile u32 G_u32SystemTime1s;                    /*!< @brief From main.c */
-extern volatile u32 G_u32SystemFlags;                     /*!< @brief From main.c */
-extern volatile u32 G_u32ApplicationFlags;                /*!< @brief From main.c */
-
-
-/***********************************************************************************************************************
-Global variable definitions with scope limited to this local application.
-Variable names shall start with "UserApp1_<type>" and be declared as static.
-***********************************************************************************************************************/
-static fnCode_type UserApp1_pfStateMachine;               /*!< @brief The state machine function pointer */
-//static u32 UserApp1_u32Timeout;                           /*!< @brief Timeout counter used across states */
-int UserApp1_au8Name[];
-
-
-/**********************************************************************************************************************
-Function Definitions
-**********************************************************************************************************************/
-
-/*--------------------------------------------------------------------------------------------------------------------*/
-/*! @publicsection */                                                                                            
-/*--------------------------------------------------------------------------------------------------------------------*/
-
-/*--------------------------------------------------------------------------------------------------------------------*/
-/*! @protectedsection */                                                                                            
-/*--------------------------------------------------------------------------------------------------------------------*/
-
+/* Functions */
 void draw_line(int start_row, int start_col, int length, int row_increment, int col_increment) {
     PixelAddressType sTargetPixel = {start_row, start_col};
     for (int i = 0; i < length; i++) {
@@ -93,117 +61,215 @@ void draw_line(int start_row, int start_col, int length, int row_increment, int 
     }
 }
 
-void colour_square(int square_pixel_dimensions, int bottom_left_pixel_row, int bottom_left_pixel_col, int row_write_direction, int col_write_direction) {
-    for (int i = 0; i < square_pixel_dimensions; i++) {
-        int row = bottom_left_pixel_row + (i * row_write_direction);
-        draw_line(row, bottom_left_pixel_col, square_pixel_dimensions, 0, col_write_direction);
+void colour_square(int square_row, int square_col, struct display_info display) {
+    for (int i = 0; i < display.square_size; i++) {
+        int row = square_row + (i * display.row_write_direction);
+        draw_line(row, square_col, display.square_size, 0, display.col_write_direction);
     }
 }
 
-void draw_board(int square_pixel_dimensions, int bottom_left_pixel_row, int bottom_left_pixel_col, int row_write_direction, int col_write_direction) {
-    int board_pixel_dimensions = (square_pixel_dimensions * 8) + 1;
+void draw_board(struct display_info display) {
+    LcdClearScreen();
+    int board_pixel_dimensions = (display.square_size * 8) + 1;
     int outer_board_dimensions = board_pixel_dimensions + 1;
-    int top_row = bottom_left_pixel_row + (8 * square_pixel_dimensions * row_write_direction) + row_write_direction;
-    int bottom_row = bottom_left_pixel_row - row_write_direction;
-    int left_col = bottom_left_pixel_col - col_write_direction;
-    int right_col = bottom_left_pixel_col + (8 * square_pixel_dimensions * col_write_direction) + col_write_direction;
+    int top_row = display.bottom_left_pixel_row + (8 * display.square_size * display.row_write_direction) + display.row_write_direction;
+    int bottom_row = display.bottom_left_pixel_row - display.row_write_direction;
+    int left_col = display.bottom_left_pixel_col - display.col_write_direction;
+    int right_col = display.bottom_left_pixel_col + (8 * display.square_size * display.col_write_direction) + display.col_write_direction;
     
     // Draw border
-    draw_line(top_row + (1 * col_write_direction), left_col, outer_board_dimensions, 0, col_write_direction); // Top border
-    draw_line(bottom_row, left_col, outer_board_dimensions, 0, col_write_direction); // Bottom border
-    draw_line(bottom_row, left_col, outer_board_dimensions, row_write_direction, 0); // Left border
-    draw_line(bottom_row, right_col + (1 * row_write_direction), outer_board_dimensions, row_write_direction, 0); // Right border
+    draw_line(top_row + (1 * display.col_write_direction), left_col, outer_board_dimensions, 0, display.col_write_direction); // Top border
+    draw_line(bottom_row, left_col, outer_board_dimensions, 0, display.col_write_direction); // Bottom border
+    draw_line(bottom_row, left_col, outer_board_dimensions, display.row_write_direction, 0); // Left border
+    draw_line(bottom_row, right_col + (1 * display.row_write_direction), outer_board_dimensions, display.row_write_direction, 0); // Right border
 
     // Colour squares
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
             if ((row + col) % 2 != 1) {
-                int square_row = bottom_left_pixel_row + (row * square_pixel_dimensions * row_write_direction);
-                int square_col = bottom_left_pixel_col + (col * square_pixel_dimensions * col_write_direction);
-                colour_square(square_pixel_dimensions, square_row, square_col, row_write_direction, col_write_direction);
+                int square_row = display.bottom_left_pixel_row + (row * display.square_size * display.row_write_direction);
+                int square_col = display.bottom_left_pixel_col + (col * display.square_size * display.col_write_direction);
+                colour_square(square_row, square_col, display);
             }
         }
     }
 }
 
-/*!--------------------------------------------------------------------------------------------------------------------
-@fn void UserApp1Initialize(void)
+void draw_menu() {
+    LcdClearScreen();
+    PixelAddressType sTargetPixel = {5, 52};
+    LcdLoadString("Menu", LCD_FONT_SMALL, &sTargetPixel);
 
-@brief
-Initializes the State Machine and its variables.
+    sTargetPixel.u16PixelRowAddress = 15;
+    sTargetPixel.u16PixelColumnAddress = 10;
+    LcdLoadString("Button 0 - New Game", LCD_FONT_SMALL, &sTargetPixel);
 
-Should only be called once in main init section.
+    sTargetPixel.u16PixelRowAddress = 35;
+    sTargetPixel.u16PixelColumnAddress = 25;
+    if (previous_result == 1) {
+        if (turn == 0) {
+            LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        else {
+            LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        sTargetPixel.u16PixelRowAddress = 45;
+        sTargetPixel.u16PixelColumnAddress = 32;
+        LcdLoadString("checkmate!", LCD_FONT_SMALL, &sTargetPixel);
+    }
+    else if (previous_result == 2) {
+        if (turn == 0) {
+            LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        else {
+            LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        sTargetPixel.u16PixelRowAddress = 45;
+        sTargetPixel.u16PixelColumnAddress = 30;
+        LcdLoadString("resignation!", LCD_FONT_SMALL, &sTargetPixel);
+    }
+    else if (previous_result == 3) {
+        LcdLoadString("Draw accepted by", LCD_FONT_SMALL, &sTargetPixel);
+        sTargetPixel.u16PixelRowAddress = 45;
+        sTargetPixel.u16PixelColumnAddress = 35;
+        if (turn == 0) {
+            LcdLoadString("black.", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        else {
+            LcdLoadString("white.", LCD_FONT_SMALL, &sTargetPixel);
+        }
+    }
+}
 
-Requires:
-- NONE
+void print_game_error(){
+    LcdClearScreen();
+    PixelAddressType sTargetPixel = {30, 30};
+    LcdLoadString("Game error", LCD_FONT_SMALL, &sTargetPixel);
+}
 
-Promises:
-- NONE
+void resign() {
+    game_state = 0;
+    previous_result = 2;
+    draw_menu();
+}
 
-*/
+PixelAddressType get_square_pixel_coordinates(int rank, int file, struct display_info display) {
+
+}
+
+void clear_square(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_white_pawn(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_white_knight(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_white_bishop(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_white_rook(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_white_queen(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_white_king(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_black_pawn(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_black_knight(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_black_bishop(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_black_rook(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_black_queen(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_black_king(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
+
+}
+
+void draw_piece(int piece, int rank, int file, int square_pixel_dimensions, struct display_info display) {
+    PixelAddressType pixel_coords = get_square_pixel_coordinates(rank, file, display);
+    draw_piece_functions[piece](pixel_coords.u16PixelRowAddress, pixel_coords.u16PixelColumnAddress, display);
+}
+
 void UserApp1Initialize(void) {
   /* If good initialization, set state to Idle */
   if(1) {
+    if (game_state == 0) {
+        draw_piece_functions[0] = clear_square;
+        draw_piece_functions[1] = draw_white_pawn;
+        draw_piece_functions[2] = draw_white_knight;
+        draw_piece_functions[3] = draw_white_bishop;
+        draw_piece_functions[4] = draw_white_rook;
+        draw_piece_functions[5] = draw_white_queen;
+        draw_piece_functions[6] = draw_white_king;
+        draw_piece_functions[7] = draw_black_pawn;
+        draw_piece_functions[8] = draw_black_knight;
+        draw_piece_functions[9] = draw_black_bishop;
+        draw_piece_functions[10] = draw_black_rook;
+        draw_piece_functions[11] = draw_black_queen;
+        draw_piece_functions[12] = draw_black_king;
+
+        draw_menu();
+    }
+    else {
+        print_game_error();
+    }
     UserApp1_pfStateMachine = UserApp1SM_Idle;
-    LcdClearScreen();
-    draw_board(DEFAULT_DISPLAY_BOARD_SQUARE_SIZE, DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_ROW, DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_COL, DEFAULT_DISPLAY_BOARD_ROW_WRITE_DIRECTION, DEFAULT_DISPLAY_BOARD_COL_WRITE_DIRECTION);
   }
   else {
     /* The task isn't properly initialized, so shut it down and don't run */
     UserApp1_pfStateMachine = UserApp1SM_Error;
   }
 
-} /* end UserApp1Initialize() */
+}
 
-  
-/*!----------------------------------------------------------------------------------------------------------------------
-@fn void UserApp1RunActiveState(void)
-
-@brief Selects and runs one iteration of the current state in the state machine.
-
-All state machines have a TOTAL of 1ms to execute, so on average n state machines
-may take 1ms / n to execute.
-
-Requires:
-- State machine function pointer points at current state
-
-Promises:
-- Calls the function to pointed by the state machine function pointer
-
-*/
-void UserApp1RunActiveState(void)
-{
+void UserApp1RunActiveState(void) {
   UserApp1_pfStateMachine();
 
-} /* end UserApp1RunActiveState */
+}
 
+// State Machine Function Definitions
+static void UserApp1SM_Idle(void) {
+    if (WasButtonPressed(BUTTON0)) {
+        ButtonAcknowledge(BUTTON0);
+        if (game_state == 0) {
+            draw_board(default_display);
+            game_state = 1;
+        }
+    }
+    else if (WasButtonPressed(BUTTON1)) {
+        ButtonAcknowledge(BUTTON1);
+    }
+    else if (IsButtonHeld(BUTTON0, 2000)) {
+        if (game_state == 1) {
+            resign();
+        }
+    }  
+}
 
-/*------------------------------------------------------------------------------------------------------------------*/
-/*! @privatesection */                                                                                            
-/*--------------------------------------------------------------------------------------------------------------------*/
-
-
-/**********************************************************************************************************************
-State Machine Function Definitions
-**********************************************************************************************************************/
-/*-------------------------------------------------------------------------------------------------------------------*/
-/* What does this state do? */
-static void UserApp1SM_Idle(void)
-{
-    
-} /* end UserApp1SM_Idle() */
-     
-
-/*-------------------------------------------------------------------------------------------------------------------*/
-/* Handle an error */
-static void UserApp1SM_Error(void)          
-{
+static void UserApp1SM_Error(void) {
   
-} /* end UserApp1SM_Error() */
-
-
-
-
-/*--------------------------------------------------------------------------------------------------------------------*/
-/* End of File                                                                                                        */
-/*--------------------------------------------------------------------------------------------------------------------*/
+}
