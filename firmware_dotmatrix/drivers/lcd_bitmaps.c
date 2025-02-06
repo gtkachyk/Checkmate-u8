@@ -1382,7 +1382,6 @@ const u8 aau8TestPosition[U8_LCD_IMAGE_ROW_SIZE_50PX][U8_LCD_IMAGE_COL_BYTES_50P
 {0x01, 0x00, 0x00, 0x00, 0x00, 0x40, 0x02}
 };
 
-
 const u8 aau8EngenuicsLogoBlackQ1[U8_LCD_IMAGE_ROW_SIZE_25PX][U8_LCD_IMAGE_COL_BYTES_25PX] = {
 {0xFF, 0xFF, 0xFF, 0x01},
 {0xFF, 0xFF, 0xFF, 0x01},
@@ -1532,3 +1531,149 @@ const u8 aau8PlayerArrow[U8_LCD_IMAGE_ARROW_ROW_SIZE][U8_LCD_IMAGE_ARROW_COL_BYT
 {0x01}
 };
 
+/* Chess App Bitmaps */
+/*** Default Display ***/
+/***** Empty Square ******/
+const u8 default_display_empty_square[7][1] = {
+{0x00},
+{0x00},
+{0x00},
+{0x00},
+{0x00},
+{0x00},
+{0x00}
+};
+
+/***** White Pieces *****/
+/******* Pawn *******/
+const u8 default_display_white_pawn[7][1] = {
+{0x00},
+{0x00},
+{0x08},
+{0x08},
+{0x08},
+{0x00},
+{0x00}
+};
+
+/******* Knight *******/
+const u8 default_display_white_knight[7][1] = {
+{0x00},
+{0x00},
+{0x18},
+{0x08},
+{0x08},
+{0x08},
+{0x00}
+};
+
+/******* Bishop *******/
+const u8 default_display_white_bishop[7][1] = {
+{0x00},
+{0x20},
+{0x10},
+{0x08},
+{0x04},
+{0x02},
+{0x00}
+};
+
+/******* Rook *******/
+const u8 default_display_white_rook[7][1] = {
+{0x00},
+{0x14},
+{0x14},
+{0x14},
+{0x14},
+{0x14},
+{0x00}
+};
+
+/******* Queen *******/
+const u8 default_display_white_queen[7][1] = {
+{0x00},
+{0x34},
+{0x14},
+{0x1C},
+{0x14},
+{0x16},
+{0x00}
+};
+
+/******* King *******/
+const u8 default_display_white_king[7][1] = {
+{0x00},
+{0x14},
+{0x0C},
+{0x04},
+{0x0C},
+{0x14},
+{0x00}
+};
+
+/***** Black Pieces *****/
+/******* Pawn *******/
+const u8 default_display_black_pawn[7][1] = {
+{0x00},
+{0x00},
+{0x00},
+{0x1C},
+{0x00},
+{0x00},
+{0x00}
+};
+
+/******* Knight *******/
+const u8 default_display_black_knight[7][1] = {
+{0x00},
+{0x08},
+{0x08},
+{0x08},
+{0x0C},
+{0x00},
+{0x00}
+};
+
+/******* Bishop *******/
+const u8 default_display_black_bishop[7][1] = {
+{0x00},
+{0x02},
+{0x04},
+{0x08},
+{0x10},
+{0x20},
+{0x00}
+};
+
+/******* Rook *******/
+const u8 default_display_black_rook[7][1] = {
+{0x00},
+{0x00},
+{0x3E},
+{0x00},
+{0x3E},
+{0x00},
+{0x00}
+};
+
+/******* Queen *******/
+const u8 default_display_black_queen[7][1] = {
+{0x00},
+{0x02},
+{0x3E},
+{0x08},
+{0x3E},
+{0x20},
+{0x00}
+};
+
+/******* King *******/
+const u8 default_display_black_king[7][1] = {
+{0x00},
+{0x14},
+{0x18},
+{0x10},
+{0x18},
+{0x14},
+{0x00}
+};

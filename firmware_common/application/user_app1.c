@@ -19,11 +19,26 @@ int UserApp1_au8Name[];
 
 /* My Variables */
 // Constants
-int DEFAULT_DISPLAY_BOARD_SQUARE_SIZE = 7;
-int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_ROW = 59;
-int DEFAULT_DISPLAY_BOARD_BOTTOM_LEFT_PIXEL_COL = 35;
-int DEFAULT_DISPLAY_BOARD_ROW_WRITE_DIRECTION = -1;
-int DEFAULT_DISPLAY_BOARD_COL_WRITE_DIRECTION = 1;
+int LIGHT_SQUARE_COLOUR = 0;
+int DARK_SQUARE_COLOUR = 1;
+int DEFAULT_DISPLAY_A1_PIXEL_ROW = 53;
+int DEFAULT_DISPLAY_A1_PIXEL_COL = 35;
+
+extern const u8 default_display_empty_square[7][1];
+
+extern const u8 default_display_white_pawn[7][1];
+extern const u8 default_display_white_knight[7][1];
+extern const u8 default_display_white_bishop[7][1];
+extern const u8 default_display_white_rook[7][1];
+extern const u8 default_display_white_queen[7][1];
+extern const u8 default_display_white_king[7][1];
+
+extern const u8 default_display_black_pawn[7][1];
+extern const u8 default_display_black_knight[7][1];
+extern const u8 default_display_black_bishop[7][1];
+extern const u8 default_display_black_rook[7][1];
+extern const u8 default_display_black_queen[7][1];
+extern const u8 default_display_black_king[7][1];
 
 // Structs
 struct display_info {
@@ -49,7 +64,7 @@ static int board[8][8] = {
     {1, 1, 1, 1, 1, 1, 1, 1}, 
     {4, 2, 3, 5, 6, 3, 2, 4}
 };
-int (*draw_piece_functions[13]) (int rank_pixel_coords, int file_pixel_coords, struct display_info display);
+u8* piece_sprites[13];
 
 /* Functions */
 void draw_line(int start_row, int start_col, int length, int row_increment, int col_increment) {
@@ -65,6 +80,14 @@ void colour_square(int square_row, int square_col, struct display_info display) 
     for (int i = 0; i < display.square_size; i++) {
         int row = square_row + (i * display.row_write_direction);
         draw_line(row, square_col, display.square_size, 0, display.col_write_direction);
+    }
+}
+
+void draw_pieces(struct display_info display) {
+    for (int rank = 0; rank < 8; rank++) {
+        for (int file = 0; file < 8; file++) {
+            draw_piece(board[rank][file], rank, file, display);
+        }
     }
 }
 
@@ -93,6 +116,9 @@ void draw_board(struct display_info display) {
             }
         }
     }
+
+    // Draw pieces
+    draw_pieces(display);
 }
 
 void draw_menu() {
@@ -153,84 +179,65 @@ void resign() {
     draw_menu();
 }
 
-PixelAddressType get_square_pixel_coordinates(int rank, int file, struct display_info display) {
-
+PixelAddressType get_square_pixel_coordinates(int rank_index, int file_index, struct display_info display) {
+    PixelAddressType coords;
+    coords.u16PixelRowAddress = (display.bottom_left_pixel_row + ((display.row_write_direction * display.square_size) * (8 - rank_index))) - (1 * display.row_write_direction);
+    coords.u16PixelColumnAddress = display.bottom_left_pixel_col + ((display.col_write_direction * display.square_size) * (file_index));
+    return coords;
 }
 
-void clear_square(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
+int get_square_colour (int rank_index, int file_index) {
+    if ((rank_index + 1) % 2 == 0) {
+        if ((file_index + 1) % 2 != 0) {
+            return 0;
+        }
+        else {
+            return 1;
+        }
+    }
+    else {
+        if ((file_index + 1) % 2 == 0) {
+            return 0;
+        }
+        else {
+            return 1;
+        }
+    }
 }
 
-void draw_white_pawn(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_white_knight(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_white_bishop(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_white_rook(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_white_queen(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_white_king(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_black_pawn(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_black_knight(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_black_bishop(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_black_rook(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_black_queen(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_black_king(int rank_pixel_coords, int file_pixel_coords, struct display_info display) {
-
-}
-
-void draw_piece(int piece, int rank, int file, int square_pixel_dimensions, struct display_info display) {
+void draw_piece(int piece, int rank, int file, struct display_info display) {
     PixelAddressType pixel_coords = get_square_pixel_coordinates(rank, file, display);
-    draw_piece_functions[piece](pixel_coords.u16PixelRowAddress, pixel_coords.u16PixelColumnAddress, display);
+    PixelBlockType image;
+    image.u16RowStart = pixel_coords.u16PixelRowAddress;
+    image.u16ColumnStart = pixel_coords.u16PixelColumnAddress;
+    image.u16RowSize = display.square_size;
+    image.u16ColumnSize = display.square_size;
+
+    if (get_square_colour(rank, file) == LIGHT_SQUARE_COLOUR) {
+        LcdLoadBitmap(piece_sprites[piece], &image);
+    }
+    else {
+        LcdLoadInverseBitmap(piece_sprites[piece], &image);
+    }
 }
 
 void UserApp1Initialize(void) {
   /* If good initialization, set state to Idle */
   if(1) {
     if (game_state == 0) {
-        draw_piece_functions[0] = clear_square;
-        draw_piece_functions[1] = draw_white_pawn;
-        draw_piece_functions[2] = draw_white_knight;
-        draw_piece_functions[3] = draw_white_bishop;
-        draw_piece_functions[4] = draw_white_rook;
-        draw_piece_functions[5] = draw_white_queen;
-        draw_piece_functions[6] = draw_white_king;
-        draw_piece_functions[7] = draw_black_pawn;
-        draw_piece_functions[8] = draw_black_knight;
-        draw_piece_functions[9] = draw_black_bishop;
-        draw_piece_functions[10] = draw_black_rook;
-        draw_piece_functions[11] = draw_black_queen;
-        draw_piece_functions[12] = draw_black_king;
+        piece_sprites[0] = &default_display_empty_square[0][0];
+        piece_sprites[1] = &default_display_white_pawn[0][0];
+        piece_sprites[2] = &default_display_white_knight[0][0];
+        piece_sprites[3] = &default_display_white_bishop[0][0];
+        piece_sprites[4] = &default_display_white_rook[0][0];
+        piece_sprites[5] = &default_display_white_queen[0][0];
+        piece_sprites[6] = &default_display_white_king[0][0];
+        piece_sprites[7] = &default_display_black_pawn[0][0];
+        piece_sprites[8] = &default_display_black_knight[0][0];
+        piece_sprites[9] = &default_display_black_bishop[0][0];
+        piece_sprites[10] = &default_display_black_rook[0][0];
+        piece_sprites[11] = &default_display_black_queen[0][0];
+        piece_sprites[12] = &default_display_black_king[0][0];
 
         draw_menu();
     }
@@ -248,10 +255,11 @@ void UserApp1Initialize(void) {
 
 void UserApp1RunActiveState(void) {
   UserApp1_pfStateMachine();
-
 }
 
 // State Machine Function Definitions
+
+// Issue: can't set pixels in different loop iterations without clearing screen
 static void UserApp1SM_Idle(void) {
     if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
@@ -262,6 +270,14 @@ static void UserApp1SM_Idle(void) {
     }
     else if (WasButtonPressed(BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
+        // draw_piece(1, 6, 7, default_display);
+        // draw_piece(1, 6, 6, default_display);
+        // draw_piece(1, 6, 5, default_display);
+        // draw_piece(1, 6, 4, default_display);
+        // draw_piece(1, 6, 3, default_display);
+        // draw_piece(1, 6, 2, default_display);
+        // draw_piece(1, 6, 1, default_display);
+        // draw_piece(1, 6, 0, default_display);
     }
     else if (IsButtonHeld(BUTTON0, 2000)) {
         if (game_state == 1) {

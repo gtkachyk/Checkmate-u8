@@ -466,6 +466,96 @@ void LcdLoadBitmap(u8 const* paau8Bitmap_, PixelBlockType* psBitmapSize_)
 
 } /* end LcdLoadBitmap() */
 
+void LcdLoadInverseBitmap(u8 const* paau8Bitmap_, PixelBlockType* psBitmapSize_)
+{
+  u8 u8CurrentBitMaskBitmap;
+  u8 u8CurrentBitMaskLcdRAM;
+  u16 u16BitGroupBitmap;
+  u16 u16BitGroupLcdRAM;
+  u8 u8RowIterations;
+  u16 u16ColumnIterations;
+  u16 u16Temp;
+  
+  /* Make sure there are at least some pixels inside the LCD screen area */
+  if( (psBitmapSize_-> u16RowStart < U16_LCD_ROWS) && (psBitmapSize_-> u16ColumnStart < U16_LCD_COLUMNS) )
+  {
+    /* Setup the number of row iterations but check to prevent overflow */
+    u8RowIterations = psBitmapSize_->u16RowSize;
+    if( (psBitmapSize_->u16RowStart + u8RowIterations) > U16_LCD_ROWS)
+    {
+      u8RowIterations = U16_LCD_ROWS - psBitmapSize_->u16RowStart;
+    }
+    
+    /* Setup the number of column iterations but check to prevent overflow */
+    u16ColumnIterations = psBitmapSize_->u16ColumnSize;
+    if( (psBitmapSize_->u16ColumnStart + u16ColumnIterations) > U16_LCD_COLUMNS)
+    {
+      u16ColumnIterations = U16_LCD_COLUMNS - psBitmapSize_->u16ColumnStart;
+    }
+
+    /* Index i is the current row in the bitmap image, and the current row in the LCD RAM 
+    image relative to psBitmapSize_->u16RowStart */
+    for(u16 i = 0; i < u8RowIterations; i++)
+    {
+      /* Sliding bit masks are used to mask out the current pixel data bit.  The image starts at bit 0. */
+      u8CurrentBitMaskBitmap = 0x01;
+      u16BitGroupBitmap = 0;
+
+      /* The LCD RAM bit mask must start at whatever bit within the current group corresponds to the 
+      starting column index */
+      u8CurrentBitMaskLcdRAM =  0x01 << (psBitmapSize_->u16ColumnStart % 8);
+      u16BitGroupLcdRAM = (psBitmapSize_->u16ColumnStart / 8);
+
+      /* Index j counts the current column (bitwise) in the image, and the current column in
+      the LCD RAM relative to psBitmapSize_->u16ColumnStart.  The bitmasks and bitgroups work out the
+      correct translation to the bytes in the images.  The bitmap must be indexed explicitly since we
+      only have a pointer to a 1D array; the LCD RAM 2D array can be indexed normally. */
+      for(u16 j = 0;  j < u16ColumnIterations; j++)
+      {
+        /* Get the linear index of the current bitmap byte 2D array - watch for incomplete bytes! */
+        if( (psBitmapSize_->u16ColumnSize % 8) == 0 )
+        {
+          u16Temp = (i * (psBitmapSize_->u16ColumnSize / 8) ) + u16BitGroupBitmap;
+        }
+        else
+        {
+          u16Temp = (i * ((psBitmapSize_->u16ColumnSize / 8) + 1)) + u16BitGroupBitmap;
+        }
+            
+        /* Set or clear appropirate bit in LCD RAM */
+        if( ~paau8Bitmap_[u16Temp] & u8CurrentBitMaskBitmap )
+        {
+          G_aau8LcdRamImage[i + psBitmapSize_->u16RowStart][u16BitGroupLcdRAM] |= u8CurrentBitMaskLcdRAM;
+        }
+        else
+        {
+          G_aau8LcdRamImage[i + psBitmapSize_->u16RowStart][u16BitGroupLcdRAM] &= ~u8CurrentBitMaskLcdRAM;
+        }
+
+        /* Shift the bitmap mask */
+        u8CurrentBitMaskBitmap <<= 1;
+        if(u8CurrentBitMaskBitmap == 0x00)
+        {
+          u8CurrentBitMaskBitmap = 0x01;
+          u16BitGroupBitmap++;
+        }
+        
+        /* Shift the LCD RAM mask */
+        u8CurrentBitMaskLcdRAM <<= 1;
+        if(u8CurrentBitMaskLcdRAM == 0x00)
+        {
+          u8CurrentBitMaskLcdRAM = 0x01;
+          u16BitGroupLcdRAM++;
+        }
+      } /* end column loop */
+    } /* end row loop */
+
+    /* Update the refresh area for the next LCD refresh */
+    LcdUpdateScreenRefreshArea(psBitmapSize_);
+  }
+
+}
+
 
 /*!--------------------------------------------------------------------------------------------------------------------
 @fn void LcdClearPixels(PixelBlockType* psPixelsToClear_)

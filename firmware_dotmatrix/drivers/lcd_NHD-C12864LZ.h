@@ -6,7 +6,7 @@
 #ifndef __LCD_C12865LZ_H
 #define __LCD_C12865LZ_H
 
-#define LCD_STARTUP_ANIMATION
+// #define LCD_STARTUP_ANIMATION
 
 /**********************************************************************************************************************
 Type Definitions
