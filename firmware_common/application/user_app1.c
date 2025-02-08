@@ -18,12 +18,36 @@ static fnCode_type UserApp1_pfStateMachine;
 int UserApp1_au8Name[];
 
 /* My Variables */
-// Constants
-int LIGHT_SQUARE_COLOUR = 0;
-int DARK_SQUARE_COLOUR = 1;
-int DEFAULT_DISPLAY_A1_PIXEL_ROW = 53;
-int DEFAULT_DISPLAY_A1_PIXEL_COL = 35;
+/*** My Variables ***/
+/***** Constants *****/
+const int LIGHT_SQUARE_COLOUR = 0;
+const int DARK_SQUARE_COLOUR = 1;
+const int DEFAULT_SQUARE_FLASH_RATE = 500;
+const int DEFAULT_ARROW_FLASH_RATE = 500;
+const int PLAYER_SYMBOL_START_COL = 5;
+const int WHITE_PLAYER_SYMBOL_WIDTH = 23;
+const int BLACK_PLAYER_SYMBOL_WIDTH = 25;
+const int WHITE_PLAYER_SYMBOL_START_ROW = 56;
+const int BLACK_PLAYER_SYMBOL_START_ROW = 4;
+const int CUSTOM_FONT_HEIGHT = 5;
+const int ARROW_SIZE = 10;
+const int ARROW_START_ROW = 28;
+const int ARROW_START_COL = 102;
 
+/******* Arrow Bitmaps *******/
+extern const u8 default_display_up_arrow[10][2];
+extern const u8 default_display_down_arrow[10][2];
+extern const u8 default_display_left_arrow[10][2];
+extern const u8 default_display_right_arrow[10][2];
+extern const u8 default_display_invisible_arrow[10][2];
+
+/******* Letter Bitmaps *******/
+extern const u8 default_display_WHITE[7][3];
+extern const u8 default_display_BLACK[7][4];
+extern const u8 default_display_TURN[18][1];
+extern const u8 default_display_MOVEMENT[40][1];
+
+/******* Piece Bitmaps *******/
 extern const u8 default_display_empty_square[7][1];
 
 extern const u8 default_display_white_pawn[7][1];
@@ -40,7 +64,7 @@ extern const u8 default_display_black_rook[7][1];
 extern const u8 default_display_black_queen[7][1];
 extern const u8 default_display_black_king[7][1];
 
-// Structs
+/***** Structs *****/
 struct display_info {
     int square_size;
     int bottom_left_pixel_row;
@@ -49,11 +73,20 @@ struct display_info {
     int col_write_direction;
 };
 
-// Game engine data
+/***** Game Engine Data *****/
 struct display_info default_display = {7, 59, 35, -1, 1};
 static int game_state = 0;
 static int previous_result = 0;
 static int turn = 1;
+static int highlighted_square[2] = {7, 0};
+static int highlighted_square_highlight_colour = 0;
+static int highlighted_square_flash_timer = 0;
+static int movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE / 2;
+static int movement_arrow_visible = 1;
+int direction_options[4][2] = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}}; // 0 = rank 1 -> 8, 1 = file a -> h, 2 = rank 8 -> 1, 3 = file h -> a
+static int movement_direction = 0; // Index of an element in direction_options
+static int selecting_direction = 1; // Boolean 
+static int selected_square[2] = {-1, -1}; // -1, -1 = no selected piece
 static int board[8][8] = {
     {10, 8, 9, 11, 12, 9, 8, 10}, 
     {7, 7, 7, 7, 7, 7, 7, 7}, 
@@ -64,6 +97,7 @@ static int board[8][8] = {
     {1, 1, 1, 1, 1, 1, 1, 1}, 
     {4, 2, 3, 5, 6, 3, 2, 4}
 };
+u8* movement_direction_sprites[4];
 u8* piece_sprites[13];
 
 /* Functions */
@@ -221,10 +255,170 @@ void draw_piece(int piece, int rank, int file, struct display_info display) {
     }
 }
 
+void highlight_square(int rank, int file, struct display_info display) {
+    PixelAddressType pixel_coords = get_square_pixel_coordinates(rank, file, display);
+    PixelBlockType image;
+    image.u16RowStart = pixel_coords.u16PixelRowAddress;
+    image.u16ColumnStart = pixel_coords.u16PixelColumnAddress;
+    image.u16RowSize = display.square_size;
+    image.u16ColumnSize = display.square_size;
+
+    if (highlighted_square_highlight_colour == LIGHT_SQUARE_COLOUR) {
+        LcdLoadInverseBitmap(piece_sprites[board[rank][file]], &image);
+        highlighted_square_highlight_colour = DARK_SQUARE_COLOUR;
+    }
+    else {
+        LcdLoadBitmap(piece_sprites[board[rank][file]], &image);
+        highlighted_square_highlight_colour = LIGHT_SQUARE_COLOUR;
+    }
+}
+
+void flash_arrow() {
+    PixelBlockType image;
+    image.u16RowStart = ARROW_START_ROW;
+    image.u16ColumnStart = ARROW_START_COL;
+    image.u16RowSize = ARROW_SIZE;
+    image.u16ColumnSize = ARROW_SIZE;
+
+    if (movement_arrow_visible) {
+        LcdLoadBitmap(&default_display_invisible_arrow, &image);
+        movement_arrow_visible = 0;
+    }
+    else {
+        LcdLoadBitmap(movement_direction_sprites[movement_direction], &image);
+        movement_arrow_visible = 1;
+    }
+}
+
+void draw_square(int rank, int file, struct display_info display) {
+    int square_colour = get_square_colour(rank, file);
+    PixelAddressType pixel_coords = get_square_pixel_coordinates(rank, file, display);
+    PixelBlockType image;
+    image.u16RowStart = pixel_coords.u16PixelRowAddress;
+    image.u16ColumnStart = pixel_coords.u16PixelColumnAddress;
+    image.u16RowSize = display.square_size;
+    image.u16ColumnSize = display.square_size;
+
+    if (square_colour == LIGHT_SQUARE_COLOUR) {
+        LcdLoadBitmap(piece_sprites[board[rank][file]], &image);
+    }
+    else {
+        LcdLoadInverseBitmap(piece_sprites[board[rank][file]], &image);
+    }
+}
+
+void draw_movement_direction() {
+    PixelBlockType image;
+    image.u16RowStart = ARROW_START_ROW;
+    image.u16ColumnStart = ARROW_START_COL;
+    image.u16RowSize = ARROW_SIZE;
+    image.u16ColumnSize = ARROW_SIZE;
+
+    LcdLoadBitmap(movement_direction_sprites[movement_direction], &image);
+}
+
+void draw_white_player_symbol() {
+    PixelBlockType image;
+    image.u16RowStart = WHITE_PLAYER_SYMBOL_START_ROW;
+    image.u16ColumnStart = PLAYER_SYMBOL_START_COL;
+    image.u16RowSize = CUSTOM_FONT_HEIGHT + 2; // Extra 2 pixels for padding
+    image.u16ColumnSize = WHITE_PLAYER_SYMBOL_WIDTH;
+
+    if (turn == 1) {
+        LcdLoadInverseBitmap(&default_display_WHITE, &image);
+    }
+    else {
+        LcdLoadBitmap(&default_display_WHITE, &image);
+    }
+}
+
+void draw_black_player_symbol() {
+    PixelBlockType image;
+    image.u16RowStart = BLACK_PLAYER_SYMBOL_START_ROW;
+    image.u16ColumnStart = PLAYER_SYMBOL_START_COL;
+    image.u16RowSize = CUSTOM_FONT_HEIGHT + 2; // Extra 2 pixels for padding
+    image.u16ColumnSize = BLACK_PLAYER_SYMBOL_WIDTH;
+
+    if (turn == 0) {
+        LcdLoadInverseBitmap(&default_display_BLACK, &image);
+    }
+    else {
+        LcdLoadBitmap(&default_display_BLACK, &image);
+    }
+}
+
+void draw_turn_symbol() {
+    PixelBlockType image;
+    image.u16RowStart = 23;
+    image.u16ColumnStart = 0;
+    image.u16RowSize = 20;
+    image.u16ColumnSize = CUSTOM_FONT_HEIGHT;
+    LcdLoadBitmap(&default_display_TURN, &image);
+}
+
+void draw_movement_symbol() {
+    PixelBlockType image;
+    image.u16RowStart = 13;
+    image.u16ColumnStart = 123;
+    image.u16RowSize = 40;
+    image.u16ColumnSize = CUSTOM_FONT_HEIGHT;
+    LcdLoadBitmap(&default_display_MOVEMENT, &image);
+}
+
+void reset_board() {
+    board[0][0] = 10;
+    board[0][1] = 8;
+    board[0][2] = 9;
+    board[0][3] = 11;
+    board[0][4] = 12;
+    board[0][5] = 9;
+    board[0][6] = 8;
+    board[0][7] = 10;
+    for (int i = 0; i < 8; i++) {
+        board[1][i] = 7;
+        board[2][i] = 0;
+        board[3][i] = 0;
+        board[4][i] = 0;
+        board[5][i] = 0;
+        board[6][i] = 1;
+    }
+    board[7][0] = 4;
+    board[7][1] = 2;
+    board[7][2] = 3;
+    board[7][3] = 5;
+    board[7][4] = 6;
+    board[7][5] = 3;
+    board[7][6] = 2;
+    board[7][7] = 4;
+}
+
+void setup_new_game() {
+    turn = 1;
+    selecting_direction = 1;
+    highlighted_square[0] = 7;
+    highlighted_square[1] = 0;
+    selected_square[0] = -1;
+    selected_square[1] = -1;
+    movement_direction = 0;
+    reset_board();
+    draw_board(default_display);
+    draw_movement_direction();
+    draw_white_player_symbol();
+    draw_black_player_symbol();
+    draw_turn_symbol();
+    draw_movement_symbol();
+    game_state = 1;
+}
+
 void UserApp1Initialize(void) {
   /* If good initialization, set state to Idle */
   if(1) {
     if (game_state == 0) {
+        movement_direction_sprites[0] = &default_display_up_arrow[0][0];
+        movement_direction_sprites[1] = &default_display_right_arrow[0][0];
+        movement_direction_sprites[2] = &default_display_down_arrow[0][0];
+        movement_direction_sprites[3] = &default_display_left_arrow[0][0];
+
         piece_sprites[0] = &default_display_empty_square[0][0];
         piece_sprites[1] = &default_display_white_pawn[0][0];
         piece_sprites[2] = &default_display_white_knight[0][0];
@@ -258,32 +452,97 @@ void UserApp1RunActiveState(void) {
 }
 
 // State Machine Function Definitions
-
-// Issue: can't set pixels in different loop iterations without clearing screen
 static void UserApp1SM_Idle(void) {
     if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
-        if (game_state == 0) {
-            draw_board(default_display);
-            game_state = 1;
+        if (game_state == 1) {
+            if (selecting_direction) {
+                // Select next direction option
+                if (movement_direction == 3) {
+                    movement_direction = 0;
+                }
+                else {
+                    movement_direction++;
+                }
+                draw_movement_direction();
+            }
+            else {
+                // Move highlighted square in the selected direction
+                draw_square(highlighted_square[0], highlighted_square[1], default_display);
+                highlighted_square[0] += direction_options[movement_direction][0];
+                highlighted_square[1] += direction_options[movement_direction][1];
+                if (highlighted_square[0] > 7) {
+                    highlighted_square[0] = 0;
+                }
+                if (highlighted_square[0] < 0) {
+                    highlighted_square[0] = 7;
+                }
+                if (highlighted_square[1] > 7) {
+                    highlighted_square[1] = 0;
+                }
+                if (highlighted_square[1] < 0) {
+                    highlighted_square[1] = 7;
+                }
+            }
+        }
+        else {
+            // Start new game
+            setup_new_game();
         }
     }
     else if (WasButtonPressed(BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
-        // draw_piece(1, 6, 7, default_display);
-        // draw_piece(1, 6, 6, default_display);
-        // draw_piece(1, 6, 5, default_display);
-        // draw_piece(1, 6, 4, default_display);
-        // draw_piece(1, 6, 3, default_display);
-        // draw_piece(1, 6, 2, default_display);
-        // draw_piece(1, 6, 1, default_display);
-        // draw_piece(1, 6, 0, default_display);
+        if (game_state == 0) {
+            // Do nothing
+        }
+        else {
+            if (selecting_direction) {
+                // Close direction selection menu
+                selecting_direction = 0;
+                draw_movement_direction();
+            }
+            else {
+                // Select highlighted piece
+                if (selected_square[0] == -1) {
+                    selected_square[0] = highlighted_square[0];
+                    selected_square[1] = highlighted_square[1];
+                }
+                else {
+                    // Attempt move
+                    // Deselect selected square
+                    selected_square[0] = -1;
+                    selected_square[1] = -1;
+                }
+            }
+        }
     }
     else if (IsButtonHeld(BUTTON0, 2000)) {
+        // Resign game
         if (game_state == 1) {
             resign();
         }
-    }  
+    }
+    else if (IsButtonHeld(BUTTON1, 500)) {
+        // Open direction selection menu
+        if (!selecting_direction) {
+            selecting_direction = 1;
+        }
+    }
+    if (game_state == 1) {
+        // Make sure the square and arrow don't flash too close to each other
+        if (highlighted_square_flash_timer == 0) {
+            highlight_square(highlighted_square[0], highlighted_square[1], default_display);
+            highlighted_square_flash_timer = DEFAULT_SQUARE_FLASH_RATE;
+            movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE / 2;
+        }
+        else if (selecting_direction && movement_arrow_flash_timer == 0) {
+            flash_arrow();
+            movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE;
+            highlighted_square_flash_timer = DEFAULT_SQUARE_FLASH_RATE / 2;
+        }
+        highlighted_square_flash_timer--;
+        movement_arrow_flash_timer--;
+    }
 }
 
 static void UserApp1SM_Error(void) {
