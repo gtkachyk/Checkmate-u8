@@ -34,6 +34,9 @@ const int ARROW_SIZE = 10;
 const int ARROW_START_ROW = 28;
 const int ARROW_START_COL = 102;
 
+/******* Selected Square *******/
+extern const u8 default_display_selected_square[7][1];
+
 /******* Arrow Bitmaps *******/
 extern const u8 default_display_up_arrow[10][2];
 extern const u8 default_display_down_arrow[10][2];
@@ -75,7 +78,7 @@ struct display_info {
 
 /***** Game Engine Data *****/
 struct display_info default_display = {7, 59, 35, -1, 1};
-static int game_state = 0;
+static int game_active = 0;
 static int previous_result = 0;
 static int turn = 1;
 static int highlighted_square[2] = {7, 0};
@@ -208,7 +211,7 @@ void print_game_error(){
 }
 
 void resign() {
-    game_state = 0;
+    game_active = 0;
     previous_result = 2;
     draw_menu();
 }
@@ -266,10 +269,18 @@ void highlight_square(int rank, int file, struct display_info display) {
     if (highlighted_square_highlight_colour == LIGHT_SQUARE_COLOUR) {
         LcdLoadInverseBitmap(piece_sprites[board[rank][file]], &image);
         highlighted_square_highlight_colour = DARK_SQUARE_COLOUR;
+        
+        if (selected_square[0] == highlighted_square[0] && selected_square[1] == highlighted_square[1]) {
+            LcdLoadInverseBitmapSetOnly(&default_display_selected_square, &image);
+        }
     }
     else {
         LcdLoadBitmap(piece_sprites[board[rank][file]], &image);
         highlighted_square_highlight_colour = LIGHT_SQUARE_COLOUR;
+        
+        if (selected_square[0] == highlighted_square[0] && selected_square[1] == highlighted_square[1]) {
+            LcdLoadBitmapSetOnly(&default_display_selected_square, &image);
+        }
     }
 }
 
@@ -304,6 +315,22 @@ void draw_square(int rank, int file, struct display_info display) {
     }
     else {
         LcdLoadInverseBitmap(piece_sprites[board[rank][file]], &image);
+    }
+}
+
+void draw_selected_square_indicator(int rank, int file, struct display_info display) {
+    int square_colour = get_square_colour(rank, file);
+    PixelAddressType pixel_coords = get_square_pixel_coordinates(rank, file, display);
+    PixelBlockType image;
+    image.u16RowStart = pixel_coords.u16PixelRowAddress;
+    image.u16ColumnStart = pixel_coords.u16PixelColumnAddress;
+    image.u16RowSize = display.square_size;
+    image.u16ColumnSize = display.square_size;
+    if (square_colour == LIGHT_SQUARE_COLOUR) {
+        LcdLoadBitmapSetOnly(&default_display_selected_square, &image);
+    }
+    else {
+        LcdLoadInverseBitmapSetOnly(&default_display_selected_square, &image);
     }
 }
 
@@ -407,13 +434,13 @@ void setup_new_game() {
     draw_black_player_symbol();
     draw_turn_symbol();
     draw_movement_symbol();
-    game_state = 1;
+    game_active = 1;
 }
 
 void UserApp1Initialize(void) {
   /* If good initialization, set state to Idle */
   if(1) {
-    if (game_state == 0) {
+    if (!game_active) {
         movement_direction_sprites[0] = &default_display_up_arrow[0][0];
         movement_direction_sprites[1] = &default_display_right_arrow[0][0];
         movement_direction_sprites[2] = &default_display_down_arrow[0][0];
@@ -453,9 +480,26 @@ void UserApp1RunActiveState(void) {
 
 // State Machine Function Definitions
 static void UserApp1SM_Idle(void) {
+    if (game_active) {
+        // Make sure the square and arrow don't flash too close to each other
+        if (highlighted_square_flash_timer == 0) {
+            highlight_square(highlighted_square[0], highlighted_square[1], default_display);
+            highlighted_square_flash_timer = DEFAULT_SQUARE_FLASH_RATE;
+            movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE / 2;
+        }
+        else if (selecting_direction) {
+            if (movement_arrow_flash_timer == 0){
+                flash_arrow();
+                movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE;
+                highlighted_square_flash_timer = DEFAULT_SQUARE_FLASH_RATE / 2;
+            }
+            movement_arrow_flash_timer--;
+        }
+        highlighted_square_flash_timer--;
+    }
     if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
-        if (game_state == 1) {
+        if (game_active) {
             if (selecting_direction) {
                 // Select next direction option
                 if (movement_direction == 3) {
@@ -469,6 +513,9 @@ static void UserApp1SM_Idle(void) {
             else {
                 // Move highlighted square in the selected direction
                 draw_square(highlighted_square[0], highlighted_square[1], default_display);
+                if (selected_square[0] == highlighted_square[0] && selected_square[1] == highlighted_square[1]) {
+                    draw_selected_square_indicator(selected_square[0], selected_square[1], default_display);
+                }
                 highlighted_square[0] += direction_options[movement_direction][0];
                 highlighted_square[1] += direction_options[movement_direction][1];
                 if (highlighted_square[0] > 7) {
@@ -492,10 +539,7 @@ static void UserApp1SM_Idle(void) {
     }
     else if (WasButtonPressed(BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
-        if (game_state == 0) {
-            // Do nothing
-        }
-        else {
+        if (game_active) {
             if (selecting_direction) {
                 // Close direction selection menu
                 selecting_direction = 0;
@@ -510,6 +554,7 @@ static void UserApp1SM_Idle(void) {
                 else {
                     // Attempt move
                     // Deselect selected square
+                    draw_square(selected_square[0], selected_square[1], default_display);
                     selected_square[0] = -1;
                     selected_square[1] = -1;
                 }
@@ -518,30 +563,15 @@ static void UserApp1SM_Idle(void) {
     }
     else if (IsButtonHeld(BUTTON0, 2000)) {
         // Resign game
-        if (game_state == 1) {
+        if (game_active) {
             resign();
         }
     }
-    else if (IsButtonHeld(BUTTON1, 500)) {
+    else if (IsButtonHeld(BUTTON0, 500)) {
         // Open direction selection menu
         if (!selecting_direction) {
             selecting_direction = 1;
         }
-    }
-    if (game_state == 1) {
-        // Make sure the square and arrow don't flash too close to each other
-        if (highlighted_square_flash_timer == 0) {
-            highlight_square(highlighted_square[0], highlighted_square[1], default_display);
-            highlighted_square_flash_timer = DEFAULT_SQUARE_FLASH_RATE;
-            movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE / 2;
-        }
-        else if (selecting_direction && movement_arrow_flash_timer == 0) {
-            flash_arrow();
-            movement_arrow_flash_timer = DEFAULT_ARROW_FLASH_RATE;
-            highlighted_square_flash_timer = DEFAULT_SQUARE_FLASH_RATE / 2;
-        }
-        highlighted_square_flash_timer--;
-        movement_arrow_flash_timer--;
     }
 }
 

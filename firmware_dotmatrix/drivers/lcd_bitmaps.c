@@ -1533,6 +1533,21 @@ const u8 aau8PlayerArrow[U8_LCD_IMAGE_ARROW_ROW_SIZE][U8_LCD_IMAGE_ARROW_COL_BYT
 
 /* Chess App Bitmaps */
 /*** Default Display ***/
+/***** Selected Square ******/
+// const u8 default_display_selected_square[1][1] = {
+//     {0x41}  
+// };
+
+const u8 default_display_selected_square[7][1] = {
+    {0x41},
+    {0x00},
+    {0x00},
+    {0x00},
+    {0x00},
+    {0x00},
+    {0x41}    
+};
+
 /***** Arrows ******/
 const u8 default_display_up_arrow[10][2] = {
     {0x10, 0x00},
