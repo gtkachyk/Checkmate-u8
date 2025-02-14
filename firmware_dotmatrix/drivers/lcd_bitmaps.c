@@ -1533,12 +1533,8 @@ const u8 aau8PlayerArrow[U8_LCD_IMAGE_ARROW_ROW_SIZE][U8_LCD_IMAGE_ARROW_COL_BYT
 
 /* Chess App Bitmaps */
 /*** Default Display ***/
-/***** Selected Square ******/
-// const u8 default_display_selected_square[1][1] = {
-//     {0x41}  
-// };
-
-const u8 default_display_selected_square[7][1] = {
+/***** Selected Square Overlay ******/
+const u8 selected_square_overlay[7][1] = {
     {0x41},
     {0x00},
     {0x00},
@@ -1549,7 +1545,7 @@ const u8 default_display_selected_square[7][1] = {
 };
 
 /***** Arrows ******/
-const u8 default_display_up_arrow[10][2] = {
+const u8 up_arrow[10][2] = {
     {0x10, 0x00},
     {0x38, 0x00},
     {0x54, 0x00},
@@ -1562,7 +1558,7 @@ const u8 default_display_up_arrow[10][2] = {
     {0x10, 0x00}
 };
 
-const u8 default_display_down_arrow[10][2] = {
+const u8 down_arrow[10][2] = {
     {0x10, 0x00},
     {0x10, 0x00},
     {0x10, 0x00},
@@ -1575,7 +1571,7 @@ const u8 default_display_down_arrow[10][2] = {
     {0x10, 0x00}
 };
 
-const u8 default_display_left_arrow[10][2] = {
+const u8 left_arrow[10][2] = {
     {0x08, 0x00},
     {0x04, 0x00},
     {0x02, 0x00},
@@ -1588,7 +1584,7 @@ const u8 default_display_left_arrow[10][2] = {
     {0x00, 0x00}
 };
 
-const u8 default_display_right_arrow[10][2] = {
+const u8 right_arrow[10][2] = {
     {0x40, 0x00},
     {0x80, 0x00},
     {0x00, 0x01},
@@ -1601,7 +1597,7 @@ const u8 default_display_right_arrow[10][2] = {
     {0x00, 0x00}    
 };
 
-const u8 default_display_invisible_arrow[10][2] = {
+const u8 invisible_arrow[10][2] = {
     {0x00, 0x00},
     {0x00, 0x00},
     {0x00, 0x00},
@@ -1615,7 +1611,7 @@ const u8 default_display_invisible_arrow[10][2] = {
 };
 
 /***** Letters ******/
-const u8 default_display_WHITE[7][3] = {
+const u8 word_WHITE[7][3] = {
     {0x00, 0x00, 0x00},
     {0xA2, 0xBA, 0x3B},
     {0xA2, 0x12, 0x09},
@@ -1625,7 +1621,7 @@ const u8 default_display_WHITE[7][3] = {
     {0x00, 0x00, 0x00}
 };
 
-const u8 default_display_BLACK[7][4] = {
+const u8 word_BLACK[7][4] = {
     {0x00, 0x00, 0x00, 0x00},
     {0xEA, 0x45, 0xE7, 0x00},
     {0x0C, 0x7D, 0x94, 0x00},
@@ -1635,7 +1631,7 @@ const u8 default_display_BLACK[7][4] = {
     {0x00, 0x00, 0x00, 0x00}
 };
 
-const u8 default_display_TURN[18][1] = {
+const u8 word_TURN[18][1] = {
     {0x1F},
     {0x08},
     {0x04},
@@ -1656,7 +1652,7 @@ const u8 default_display_TURN[18][1] = {
     {0x01},
 };
 
-const u8 default_display_MOVEMENT[40][1] = {
+const u8 word_MOVEMENT[40][1] = {
     {0x1F},
     {0x08},
     {0x04},
@@ -1700,7 +1696,7 @@ const u8 default_display_MOVEMENT[40][1] = {
 };
 
 /***** Empty Square ******/
-const u8 default_display_empty_square[7][1] = {
+const u8 empty_square[7][1] = {
 {0x00},
 {0x00},
 {0x00},
@@ -1712,7 +1708,7 @@ const u8 default_display_empty_square[7][1] = {
 
 /***** White Pieces *****/
 /******* Pawn *******/
-const u8 default_display_white_pawn[7][1] = {
+const u8 white_pawn[7][1] = {
 {0x00},
 {0x00},
 {0x08},
@@ -1723,7 +1719,7 @@ const u8 default_display_white_pawn[7][1] = {
 };
 
 /******* Knight *******/
-const u8 default_display_white_knight[7][1] = {
+const u8 white_knight[7][1] = {
 {0x00},
 {0x00},
 {0x18},
@@ -1734,7 +1730,7 @@ const u8 default_display_white_knight[7][1] = {
 };
 
 /******* Bishop *******/
-const u8 default_display_white_bishop[7][1] = {
+const u8 white_bishop[7][1] = {
 {0x00},
 {0x20},
 {0x10},
@@ -1745,7 +1741,7 @@ const u8 default_display_white_bishop[7][1] = {
 };
 
 /******* Rook *******/
-const u8 default_display_white_rook[7][1] = {
+const u8 white_rook[7][1] = {
 {0x00},
 {0x14},
 {0x14},
@@ -1756,7 +1752,7 @@ const u8 default_display_white_rook[7][1] = {
 };
 
 /******* Queen *******/
-const u8 default_display_white_queen[7][1] = {
+const u8 white_queen[7][1] = {
 {0x00},
 {0x34},
 {0x14},
@@ -1767,7 +1763,7 @@ const u8 default_display_white_queen[7][1] = {
 };
 
 /******* King *******/
-const u8 default_display_white_king[7][1] = {
+const u8 white_king[7][1] = {
 {0x00},
 {0x14},
 {0x0C},
@@ -1779,7 +1775,7 @@ const u8 default_display_white_king[7][1] = {
 
 /***** Black Pieces *****/
 /******* Pawn *******/
-const u8 default_display_black_pawn[7][1] = {
+const u8 black_pawn[7][1] = {
 {0x00},
 {0x00},
 {0x00},
@@ -1790,7 +1786,7 @@ const u8 default_display_black_pawn[7][1] = {
 };
 
 /******* Knight *******/
-const u8 default_display_black_knight[7][1] = {
+const u8 black_knight[7][1] = {
 {0x00},
 {0x08},
 {0x08},
@@ -1801,7 +1797,7 @@ const u8 default_display_black_knight[7][1] = {
 };
 
 /******* Bishop *******/
-const u8 default_display_black_bishop[7][1] = {
+const u8 black_bishop[7][1] = {
 {0x00},
 {0x02},
 {0x04},
@@ -1812,7 +1808,7 @@ const u8 default_display_black_bishop[7][1] = {
 };
 
 /******* Rook *******/
-const u8 default_display_black_rook[7][1] = {
+const u8 black_rook[7][1] = {
 {0x00},
 {0x00},
 {0x3E},
@@ -1823,7 +1819,7 @@ const u8 default_display_black_rook[7][1] = {
 };
 
 /******* Queen *******/
-const u8 default_display_black_queen[7][1] = {
+const u8 black_queen[7][1] = {
 {0x00},
 {0x02},
 {0x3E},
@@ -1834,7 +1830,7 @@ const u8 default_display_black_queen[7][1] = {
 };
 
 /******* King *******/
-const u8 default_display_black_king[7][1] = {
+const u8 black_king[7][1] = {
 {0x00},
 {0x14},
 {0x18},

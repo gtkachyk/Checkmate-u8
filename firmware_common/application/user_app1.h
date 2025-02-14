@@ -18,19 +18,35 @@ To start a new task using this user_app1 as a template:
 #ifndef __USER_APP1_H
 #define __USER_APP1_H
 
-/**********************************************************************************************************************
-Type Definitions
-**********************************************************************************************************************/
+/* Type Definitions */
+typedef enum {
+    RESULT_NONE = 0,
+    RESULT_CHECKMATE = 1,
+    RESULT_RESIGNATION = 2,
+    RESULT_DRAW = 3
+} GameResult;
 
+typedef enum {
+    UP = 0,
+    RIGHT = 1,
+    DOWN = 2,
+    LEFT = 3
+} MovementDirection;
 
-/**********************************************************************************************************************
-Function Declarations
-**********************************************************************************************************************/
+typedef enum {
+    BLACK = 0,
+    WHITE = 1,
+} Colour;
 
+typedef struct {
+    int8_t row;
+    int8_t col;
+} Square;
+
+/* Function Declarations */
 /*------------------------------------------------------------------------------------------------------------------*/
 /*! @publicsection */                                                                                            
 /*--------------------------------------------------------------------------------------------------------------------*/
-
 
 /*------------------------------------------------------------------------------------------------------------------*/
 /*! @protectedsection */                                                                                            
@@ -38,24 +54,52 @@ Function Declarations
 void UserApp1Initialize(void);
 void UserApp1RunActiveState(void);
 
-
 /*------------------------------------------------------------------------------------------------------------------*/
 /*! @privatesection */                                                                                            
 /*--------------------------------------------------------------------------------------------------------------------*/
 
+/* State Machine Declarations */
+static void Chess_Menu(void);
+static void Chess_Game_Selecting_Direction(void);
+static void Chess_Game_Selecting_Square(void);
+static void UserApp1SM_Error(void); 
 
-/***********************************************************************************************************************
-State Machine Declarations
-***********************************************************************************************************************/
-static void UserApp1SM_Idle(void);    
-static void UserApp1SM_Error(void);         
+/* Macros */
+#define IS_SQUARE_NULL(s) ((s).row == -1)
+#define ARE_SQUARES_EQUAL(s1, s2) ((s1).row == (s2).row && (s1).col == (s2).col)
 
-
-
-/**********************************************************************************************************************
-Constants / Definitions
-**********************************************************************************************************************/
-
+/* Constants / Definitions */
+#define SQUARE_PIXEL_SIZE (u8)7
+#define BOARD_BOTTOM_LEFT_PIXEL_ROW (u8)59
+#define BOARD_BOTTOM_LEFT_PIXEL_COL (u8)35
+#define DISPLAY_ROW_DIRECTION (int8_t)-1
+#define DISPLAY_COL_DIRECTION (u8)1
+#define SQUARE_FLASH_RATE (u16)500
+#define ARROW_FLASH_RATE (u16)500
+#define PLAYER_SYMBOL_START_COL (u8)5
+#define WHITE_PLAYER_SYMBOL_WIDTH (u8)23
+#define BLACK_PLAYER_SYMBOL_WIDTH (u8)25
+#define WHITE_PLAYER_SYMBOL_START_ROW (u8)56
+#define BLACK_PLAYER_SYMBOL_START_ROW (u8)4
+#define CUSTOM_FONT_HEIGHT (u8)5
+#define ARROW_SIZE (u8)10
+#define ARROW_START_ROW (u8)28
+#define ARROW_START_COL (u8)102
+#define DIRECTION_OPTIONS (u8)4
+#define BOARD_SIZE (u8)8
+#define EMPTY_SQUARE (u8)0
+#define WHITE_PAWN (u8)1
+#define WHITE_KNIGHT (u8)2
+#define WHITE_BISHOP (u8)3
+#define WHITE_ROOK (u8)4
+#define WHITE_QUEEN (u8)5
+#define WHITE_KING (u8)6
+#define BLACK_PAWN (u8)7
+#define BLACK_KNIGHT (u8)8
+#define BLACK_BISHOP (u8)9
+#define BLACK_ROOK (u8)10
+#define BLACK_QUEEN (u8)11
+#define BLACK_KING (u8)12
 
 #endif /* __USER_APP1_H */
 
