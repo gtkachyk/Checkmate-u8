@@ -62,7 +62,12 @@ void UserApp1RunActiveState(void);
 static void Chess_Menu(void);
 static void Chess_Game_Selecting_Direction(void);
 static void Chess_Game_Selecting_Square(void);
-static void UserApp1SM_Error(void); 
+static void Chess_Game_Debug(void);
+static void Chess_Game_Run_Test(void);
+static void Chess_Game_Lift_Piece(void);
+static void Chess_Game_Place_Piece(void);
+static void Chess_Game_Update_Player_Symbols(void);
+static void UserApp1SM_Error(void);
 
 /* Macros */
 #define IS_SQUARE_NULL(s) ((s).row == -1)
@@ -76,6 +81,7 @@ static void UserApp1SM_Error(void);
 #define DISPLAY_COL_DIRECTION (u8)1
 #define SQUARE_FLASH_RATE (u16)500
 #define ARROW_FLASH_RATE (u16)500
+#define DRAW_TIMER_MAX 250
 #define PLAYER_SYMBOL_START_COL (u8)5
 #define WHITE_PLAYER_SYMBOL_WIDTH (u8)23
 #define BLACK_PLAYER_SYMBOL_WIDTH (u8)25
@@ -100,6 +106,24 @@ static void UserApp1SM_Error(void);
 #define BLACK_ROOK (u8)10
 #define BLACK_QUEEN (u8)11
 #define BLACK_KING (u8)12
+
+#define A 0
+#define B 1
+#define C 2
+#define D 3
+#define E 4
+#define F 5
+#define G 6
+#define H 7
+
+#define ONE 7
+#define TWO 6
+#define THREE 5
+#define FOUR 4
+#define FIVE 3
+#define SIX 2
+#define SEVEN 1
+#define EIGHT 0
 
 #endif /* __USER_APP1_H */
 
