@@ -43,6 +43,17 @@ typedef struct {
     int8_t col;
 } Square;
 
+typedef void (*FuncPtr)(void);
+
+typedef struct Node {
+    FuncPtr data;
+    struct Node* next;
+} Node;
+
+typedef struct Queue {
+    Node *front, *rear;
+} Queue;
+
 /* Function Declarations */
 /*------------------------------------------------------------------------------------------------------------------*/
 /*! @publicsection */                                                                                            
@@ -62,11 +73,18 @@ void UserApp1RunActiveState(void);
 static void Chess_Menu(void);
 static void Chess_Game_Selecting_Direction(void);
 static void Chess_Game_Selecting_Square(void);
-static void Chess_Game_Debug(void);
-static void Chess_Game_Run_Test(void);
 static void Chess_Game_Lift_Piece(void);
 static void Chess_Game_Place_Piece(void);
 static void Chess_Game_Update_Player_Symbols(void);
+static void Chess_Game_Flash_Highlighted_Square(void);
+static void Chess_Game_Flash_Movement_Indicator(void);
+static void Chess_Game_Move_Highlighted_Square_Part_1(void);
+static void Chess_Game_Move_Highlighted_Square_Part_2(void);
+static void Chess_Game_Attempt_Move(void);
+static void Chess_Game_Deselect_Selected_Square(void);
+static void Chess_Game_Change_Movement_Direction(void);
+static void Chess_Game_Close_Movement_Direction_Menu(void);
+static void Chess_Game_Selecting_Square(void);
 static void UserApp1SM_Error(void);
 
 /* Macros */
@@ -124,6 +142,9 @@ static void UserApp1SM_Error(void);
 #define SIX 2
 #define SEVEN 1
 #define EIGHT 0
+
+#define WHITE_PAWN_START_RANK 6
+#define BLACK_PAWN_START_RANK 1
 
 #endif /* __USER_APP1_H */
 

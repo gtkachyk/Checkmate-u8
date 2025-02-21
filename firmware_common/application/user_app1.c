@@ -50,13 +50,17 @@ static Colour turn = WHITE;
 static MovementDirection direction = UP;
 static Square highlighted_square = {7, 0};
 static Square selected_square = {-1, -1};
-static Colour highlighted_square_highlight_colour = 0;
 static uint16_t highlighted_square_flash_timer = 0;
 static uint16_t movement_arrow_flash_timer = ARROW_FLASH_RATE / 2;
-static bool movement_arrow_visible = 1;
+static Colour highlighted_square_highlight_colour = BLACK;
+static bool movement_arrow_visible = TRUE;
 
-static uint8_t white_pawn_states[8] = {2, 2, 2, 2, 2, 2, 2, 2};
-static uint8_t black_pawn_states[8] = {2, 2, 2, 2, 2, 2, 2, 2};
+static uint8_t white_pawns_special_move_status = 0xFF;
+static uint8_t black_pawns_special_move_status = 0xFF;
+static Square en_passantable = {-1, -1};
+static Square white_king_square = {7, 4}; // Tracks the location of the white king
+static Square black_king_square = {0, 4}; // Tracks the location of the black king
+static bool king_in_check = FALSE; // Tracks if the moving player's king is in check
 
 static u8 board[8][8] = {
     {10, 8, 9, 11, 12, 9, 8, 10}, 
@@ -77,14 +81,76 @@ u8* piece_sprites[13] = {
 extern u8 G_au8DebugScanBuffer[DEBUG_SCANF_BUFFER_SIZE];
 extern u8 G_u8DebugScanfCharCount;
 
-static bool debug = 1;
-
-static PixelBlockType image1;
 static int draw_timer = DRAW_TIMER_MAX;
-static int current_test = 1;
-static bool expected_result;
+static bool attempting_en_passant = FALSE;
+static bool attempting_short_castle = FALSE;
+static bool attempting_long_castle = FALSE;
+static bool white_has_short_castle_privileges = TRUE;
+static bool black_has_short_castle_privileges = TRUE;
+static bool white_has_long_castle_privileges = TRUE;
+static bool black_has_long_castle_privileges = TRUE;
+static Queue state_queue;
 
 /* Functions */
+Node* createNode(int new_data) {
+    Node* new_node = (Node*)malloc(sizeof(Node));
+    new_node->data = new_data;
+    new_node->next = NULL;
+    return new_node;
+}
+
+Queue* createQueue() {
+    Queue* q = (Queue*)malloc(sizeof(Queue));
+    q->front = q->rear = NULL;
+    return q;
+}
+
+int isEmpty(Queue* q) {
+    if (q->front == NULL && q->rear == NULL) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+void enqueue(Queue* q, FuncPtr new_data) {
+    Node* new_node = createNode(new_data);
+    if (q->rear == NULL) {
+        q->front = q->rear = new_node;
+        return;
+    }
+    q->rear->next = new_node;
+    q->rear = new_node;
+}
+
+void dequeue(Queue* q) {
+    if (isEmpty(q)) {
+        return;
+    }
+    Node* temp = q->front;
+    q->front = q->front->next;
+    if (q->front == NULL)
+        q->rear = NULL;
+    free(temp);
+}
+
+FuncPtr getFront(Queue* q) {
+    if (isEmpty(q)) {
+        return NULL;
+    }
+    return q->front->data;
+}
+
+FuncPtr getRear(Queue* q) {
+    if (isEmpty(q)) {
+        return NULL;
+    }
+    return q->rear->data;
+}
+
+void set_square(uint8_t file, uint8_t rank, uint8_t piece) {
+    board[rank][file] = piece;
+}
+
 PixelAddressType get_square_pixel_coordinates(uint8_t rank_index, uint8_t file_index) {
     return (PixelAddressType) {
         .u16PixelRowAddress = (BOARD_BOTTOM_LEFT_PIXEL_ROW + ((DISPLAY_ROW_DIRECTION * SQUARE_PIXEL_SIZE) * (BOARD_SIZE - rank_index))) - (1 * DISPLAY_ROW_DIRECTION),
@@ -377,52 +443,6 @@ void reset_board() {
     board[7][7] = 4;
 }
 
-void setup_move(int file_start, int rank_start, int file_end, int rank_end) {
-    selected_square.row = rank_start;
-    selected_square.col = file_start;
-    highlighted_square.row = rank_end;
-    highlighted_square.col = file_end;
-}
-
-void setup_test() {
-    // Pawn moves
-    if (current_test == 1) {
-        setup_move(D, TWO, C, THREE);
-        expected_result = FALSE;
-    }
-    else if (current_test == 2) {
-        setup_move(D, TWO, D, THREE);
-        expected_result = TRUE;
-    }
-    else if (current_test == 3) {
-        setup_move(D, TWO, E, THREE);
-        expected_result = FALSE;
-    }
-    else if (current_test == 4) {
-        setup_move(D, TWO, C, FOUR);
-        expected_result = FALSE;
-    }
-    else if (current_test == 5) {
-        setup_move(D, TWO, D, FOUR);
-        expected_result = TRUE;
-    }
-    else if (current_test == 6) {
-        setup_move(D, TWO, E, FOUR);
-        expected_result = FALSE;
-    }
-}
-
-void setup_test_environment() {
-    draw_timer = DRAW_TIMER_MAX;
-    turn = WHITE;
-    highlighted_square.row = 7;
-    highlighted_square.col = 0;
-    selected_square.row = -1;
-    direction = UP;
-    reset_board();
-    draw_board();
-}
-
 void setup_new_game() {
     turn = WHITE;
     highlighted_square.row = 7;
@@ -435,8 +455,6 @@ void setup_new_game() {
     draw_player_symbols();
     draw_turn_symbol();
     draw_movement_symbol();
-    
-    UserApp1_pfStateMachine = Chess_Game_Selecting_Direction;
 }
 
 void print_int_var (u8 name[], u32 val) {
@@ -460,143 +478,154 @@ void print_str (u8 str[]) {
     DebugLineFeed();
 }
 
-void print_test_failed_message() {
-    DebugPrintf("Failed test ");
-    DebugPrintNumber(current_test);
-    DebugLineFeed();
+void update_white_pawn_special_move_status(uint8_t file) {
+    white_pawns_special_move_status = white_pawns_special_move_status | (0 << file);
 }
 
-void print_test_passed_message() {
-    DebugPrintf("Passed test ");
-    DebugPrintNumber(current_test);
-    DebugLineFeed();
+bool get_white_pawn_special_move_status(uint8_t file) {
+    return (white_pawns_special_move_status >> file) & 1;
+}
+
+void update_black_pawn_special_move_status(uint8_t file) {
+    black_pawns_special_move_status = black_pawns_special_move_status | (0 << file);
+}
+
+bool get_black_pawn_special_move_status(uint8_t file) {
+    return (black_pawns_special_move_status >> file) & 1;
+}
+
+bool coordinates_are_valid(uint8_t row, uint8_t col) {
+    if (row > 0 || row < 7 || col > 0 || col < 7) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+uint8_t get_piece_colour(uint8_t piece) {
+    if (piece > 0 && piece < 7) {
+        return WHITE;
+    }
+    else if (piece > 6 && piece < 13) {
+        return BLACK;
+    }
+    else {
+        return -1;
+    }
+}
+
+bool is_path_clear(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) {
+    int8_t row_dir = (row_2 > row_1) - (row_2 < row_1); // -1, 0, or 1
+    int8_t col_dir = (col_2 > col_1) - (col_2 < col_1);
+
+    uint8_t i = row_1 + row_dir;
+    uint8_t j = col_1 + col_dir;
+    
+    while (i != row_2 || j != col_2) {
+        if (board[i][j] != EMPTY_SQUARE) return FALSE;
+        i += row_dir;
+        j += col_dir;
+    }
+    return TRUE;
+}
+
+// Debug message template: printf("Attempting to move <piece_name> on %c%c to %c%c...\n", file_index_to_notation(col_1), rank_index_to_notation(row_1), file_index_to_notation(col_2), rank_index_to_notation(row_2));
+bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) {
+    // printf("piece_can_move called with row_1 = %u, col_1 = %u\n", row_1, col_1);
+    if (!coordinates_are_valid(row_1, col_1) || !coordinates_are_valid(row_2, col_2)) return FALSE;
+    uint8_t piece = board[row_1][col_1];
+    uint8_t destination_square = board[row_2][col_2];
+    if (get_piece_colour(piece) == get_piece_colour(destination_square)) return FALSE;
+    if (piece == EMPTY_SQUARE) return FALSE;
+
+    int8_t row_change = row_2 - row_1;
+    int8_t col_change = col_2 - col_1;
+    if (piece == WHITE_PAWN || piece == BLACK_PAWN) {
+        int direction = (piece == WHITE_PAWN) ? -1 : 1;
+        if (row_2 == row_1 + direction && col_2 == col_1 && destination_square == EMPTY_SQUARE) {
+            // Standard move
+            return TRUE;
+        }
+        else if (row_2 == row_1 + direction && abs(col_2 - col_1) == 1) {
+            // Capture
+            if (get_piece_colour(destination_square) == BLACK) {
+                // Standard
+                return TRUE;
+            }
+            else if (destination_square == EMPTY_SQUARE && en_passantable.row == row_1 && en_passantable.col == col_2 && board[row_1][col_2] == BLACK_PAWN) {
+                // En passant
+                attempting_en_passant = TRUE;
+                return TRUE;
+            }
+        }
+        else if (row_2 == row_1 + direction*2 && col_2 == col_1 && destination_square == EMPTY_SQUARE && board[row_1 + direction][col_1] == EMPTY_SQUARE && get_white_pawn_special_move_status(col_1)) {
+            // Special move
+            return TRUE;
+        }
+    }
+    else if (piece == WHITE_KNIGHT || piece == BLACK_KNIGHT) {
+        if (((abs(row_2 - row_1) == 2 && abs(col_2 - col_1) == 1) || (abs(row_2 - row_1) == 1 && abs(col_2 - col_1) == 2))) {
+            return TRUE;
+        }
+    }
+    else if (piece == WHITE_BISHOP || piece == BLACK_BISHOP) {
+        return (abs(row_change) == abs(col_change) && is_path_clear(row_1, col_1, row_2, col_2));
+    }
+    else if (piece == WHITE_ROOK || piece == BLACK_ROOK) {
+        return ((row_1 == row_2 || col_1 == col_2) && is_path_clear(row_1, col_1, row_2, col_2));
+    }
+    else if (piece == WHITE_QUEEN || piece == BLACK_QUEEN) {
+        return ((abs(row_change) == abs(col_change) || row_1 == row_2 || col_1 == col_2) && is_path_clear(row_1, col_1, row_2, col_2));
+    }
+    else if (piece == WHITE_KING) {
+        // Standard movement
+        if ((row_change == 0 || abs(row_change) == 1) && (col_change == 0 || abs(col_change) == 1)) {
+            return TRUE;
+        }
+        else if (row_1 == ONE && col_1 == E && row_2 == ONE) {
+            if (white_has_short_castle_privileges && col_2 == G && board[ONE][F] == EMPTY_SQUARE && board[ONE][G] == EMPTY_SQUARE && board[ONE][H] == WHITE_ROOK) {
+                attempting_short_castle = TRUE;
+                return TRUE;
+            }
+            else if (white_has_long_castle_privileges && col_2 == C && board[ONE][D] == EMPTY_SQUARE && board[ONE][C] == EMPTY_SQUARE && board[ONE][B] == EMPTY_SQUARE && board[ONE][A] == WHITE_ROOK) {
+                attempting_long_castle = TRUE;
+                return TRUE;
+            }
+        }
+    }
+    else if (piece == BLACK_KING) {
+        // Standard movement
+        if ((row_change == 0 || abs(row_change) == 1) && (col_change == 0 || abs(col_change) == 1)) {
+            return TRUE;
+        }
+        else if (row_1 == EIGHT && col_1 == E && row_2 == EIGHT) {
+            if (black_has_short_castle_privileges && col_2 == G && board[EIGHT][F] == EMPTY_SQUARE && board[EIGHT][G] == EMPTY_SQUARE && board[EIGHT][H] == BLACK_ROOK) {
+                attempting_short_castle = TRUE;
+                return TRUE;
+            }
+            else if (black_has_long_castle_privileges && col_2 == C && board[EIGHT][D] == EMPTY_SQUARE && board[EIGHT][C] == EMPTY_SQUARE && board[EIGHT][B] == EMPTY_SQUARE && board[EIGHT][A] == BLACK_ROOK) {
+                attempting_long_castle = TRUE;
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
 }
 
 bool is_valid_move() {
-    uint8_t piece = board[selected_square.row][selected_square.col];
-
-    // If there is no piece on the start square, return false
-    if (piece == EMPTY_SQUARE) return FALSE;
-
-    // If the move starts and ends on the same square, return false
-    if (selected_square.row == highlighted_square.row && selected_square.col == highlighted_square.col) return FALSE;
-
-    int8_t row_change = highlighted_square.row - selected_square.row;
-    int8_t col_change = highlighted_square.col - selected_square.col;
-    print_int_var("row_change", abs(row_change));
-    print_int_var("col_change", abs(col_change));
-
-    // If the movement of piece is blocked by another piece, return false
-    if (piece != WHITE_KNIGHT && piece != BLACK_KNIGHT) {
-        uint8_t row_direction = 0;
-        uint8_t col_direction = 0;
-        if (row_change >= 0) {
-            row_direction = 1;
-        }
-        else {
-            row_direction = -1;
-        }
-        if (col_change >= 0) {
-            col_direction = 1;
-        }
-        else {
-            col_direction = -1;
-        }
-
-        uint8_t i = selected_square.row + row_direction;
-        uint8_t j = selected_square.col + col_direction;
-        while (i != highlighted_square.row && j != highlighted_square.col) {
-            if (board[i][j] != EMPTY_SQUARE) {
-                print_str("Move invalid: blocked by piece");
-                return FALSE;
-            }
-            if (i != highlighted_square.row) {
-                i += row_direction;
-            }
-            if (j != highlighted_square.col) {
-                j += col_direction;
-            }
-        }
-
-        // If there is a piece of the same colour as piece on the end square, return false
-        if (turn == WHITE && board[i][j] > EMPTY_SQUARE && board[i][j] < WHITE_KING) {
-            print_str("Move invalid: blocked by piece on end square");
-            return FALSE;
-        }
-        if (turn == BLACK && board[i][j] > WHITE_KING && board[i][j] < BLACK_KING + 1) {
-            print_str("Move invalid: blocked by piece on end square");
-            return FALSE;
-        }
-    }
-
-    // If the move violates the movement rules of piece
-    if (piece == WHITE_PAWN) {
-        print_str("White pawn");
-        if (!(row_change == -2 || row_change == -1)) {
-            print_str("Move invalid: pawns can only move 1 or 2 rows");
-            return FALSE;
-        }
-        if (col_change < -1 || col_change > 1) {
-            print_str("Move invalid: pawns can only move 1 column");
-            return FALSE;
-        }
-        if (row_change == -1 && abs(col_change) == 1 && board[highlighted_square.row][highlighted_square.col] == EMPTY_SQUARE) {
-            print_str("Move invalid: pawns can only move diagonally if it's to capture a piece");
-            return FALSE;
-        }
-        if (row_change == -2) {
-            if (white_pawn_states[selected_square.row] != 2) {
-                print_str("Move invalid: pawns can only move 2 rows if they haven't already moved");
-                return FALSE;
-            }
-            if (col_change != 0) {
-                print_str("Move invalid: pawns cannot move diagonally if they move forward two squares");
-                return FALSE;
-            }
-        }
-    }
-    else if (piece == BLACK_PAWN) {
-        if (!(row_change == 2 || row_change == 1)) return FALSE;
-        if (row_change == 2 && black_pawn_states[selected_square.row] != 2) return FALSE;
-        if (col_change < -1 || col_change > 1) return FALSE;
-        print_str("Black pawn");
-    }
-    else if (piece == WHITE_KNIGHT || piece == BLACK_KNIGHT) {
-        print_str("Knight");
-        if (abs(row_change) == 2 && abs(col_change) != 1) return FALSE;
-        if (abs(row_change) == 1 && abs(col_change) != 2) return FALSE;
-    }
-    else if (piece == WHITE_BISHOP || piece == BLACK_BISHOP) {
-        print_str("Bishop");
-        if (row_change != col_change) return FALSE;
-    }
-    else if (piece == WHITE_ROOK || piece == BLACK_ROOK) {
-        print_str("Rook");
-        if (!(row_change == 0 || col_change == 0)) return FALSE;
-    }
-    else if (piece == WHITE_QUEEN || piece == BLACK_QUEEN) {
-        print_str("Queen");
-        if (row_change == -1 && col_change == -1) return TRUE;
-        if ((row_change != col_change) && !(row_change == 0 || col_change == 0)) return FALSE;
-    }
-    else if (piece == WHITE_KING || piece == BLACK_KING) {
-        print_str("King");
-        if (row_change < -1 || row_change > 1 || col_change < -1 || col_change > 1) return FALSE;
+    if (piece_can_move(selected_square.row, selected_square.col, highlighted_square.row, highlighted_square.col)) {
+        return TRUE;
     }
     else {
         return FALSE;
     }
-
-    print_str("Returned TRUE");
-    return TRUE;
 }
 
-void move_piece() {
-    draw_piece(EMPTY_SQUARE, selected_square.row, selected_square.col);
-    draw_piece(board[selected_square.row][selected_square.col], highlighted_square.row, highlighted_square.col);
-    board[highlighted_square.row][highlighted_square.col] = board[selected_square.row][selected_square.col];
-    board[selected_square.row][selected_square.col] = EMPTY_SQUARE;
-}
+// void move_piece() {
+//     draw_piece(EMPTY_SQUARE, selected_square.row, selected_square.col);
+//     draw_piece(board[selected_square.row][selected_square.col], highlighted_square.row, highlighted_square.col);
+//     board[highlighted_square.row][highlighted_square.col] = board[selected_square.row][selected_square.col];
+//     board[selected_square.row][selected_square.col] = EMPTY_SQUARE;
+// }
 
 void change_turn() {
     if (turn == WHITE) {
@@ -608,8 +637,10 @@ void change_turn() {
 }
 
 void UserApp1Initialize(void) {
-  if(1) {
+  if (1) {
     draw_menu();
+    enqueue(&state_queue, &Chess_Game_Flash_Highlighted_Square);
+    enqueue(&state_queue, &Chess_Game_Flash_Movement_Indicator);
     UserApp1_pfStateMachine = Chess_Menu;
   }
   else {
@@ -626,131 +657,97 @@ static void Chess_Menu(void) {
     if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
         setup_new_game();
-        UserApp1_pfStateMachine = Chess_Game_Debug;
-    }
-}
-
-static void Chess_Game_Debug(void) {
-    if (WasButtonPressed(BUTTON0)) {
-        ButtonAcknowledge(BUTTON0);
-        setup_test_environment();
-        setup_test();
-        UserApp1_pfStateMachine = Chess_Game_Run_Test;
-    }
-}
-
-static void Chess_Game_Run_Test(void) {
-    bool is_valid_move_result = is_valid_move();
-    if (is_valid_move_result == expected_result) {
-        print_test_passed_message();
-        current_test++;
-    }
-    else {
-        print_test_failed_message();
-    }
-    if (is_valid_move_result) {
-        draw_timer = DRAW_TIMER_MAX;
-        change_turn();
-        UserApp1_pfStateMachine = Chess_Game_Lift_Piece;
-    }
-    else {
-        UserApp1_pfStateMachine = Chess_Game_Debug;
+        return_state = Chess_Game_Selecting_Direction;
+        UserApp1_pfStateMachine = Chess_Game_Selecting_Direction;
     }
 }
 
 static void Chess_Game_Lift_Piece(void) {
-    draw_timer--;
-    if (draw_timer == 0) {
-        draw_timer = DRAW_TIMER_MAX;
-        draw_piece(EMPTY_SQUARE, selected_square.row, selected_square.col);
-        UserApp1_pfStateMachine = Chess_Game_Place_Piece;
-    }
+    draw_piece(EMPTY_SQUARE, selected_square.row, selected_square.col);
+    UserApp1_pfStateMachine = return_state;
 }
 
 static void Chess_Game_Place_Piece(void) {
-    draw_timer--;
-    if (draw_timer == 0) {
-        draw_timer = DRAW_TIMER_MAX;
-        draw_piece(board[selected_square.row][selected_square.col], highlighted_square.row, highlighted_square.col);
+    draw_piece(board[selected_square.row][selected_square.col], highlighted_square.row, highlighted_square.col);
+    if (attempting_en_passant) {
         board[highlighted_square.row][highlighted_square.col] = board[selected_square.row][selected_square.col];
         board[selected_square.row][selected_square.col] = EMPTY_SQUARE;
-        UserApp1_pfStateMachine = Chess_Game_Update_Player_Symbols;
+        board[en_passantable.row][en_passantable.col] = EMPTY_SQUARE;
+        en_passantable.row = -1;
+        en_passantable.col = -1;
+        attempting_en_passant = FALSE;
     }
+    else {
+        board[highlighted_square.row][highlighted_square.col] = board[selected_square.row][selected_square.col];
+        board[selected_square.row][selected_square.col] = EMPTY_SQUARE;
+    }
+    UserApp1_pfStateMachine = return_state;
 }
 
 static void Chess_Game_Update_Player_Symbols(void) {
-    draw_timer--;
-    if (draw_timer == 0) {
-        draw_timer = DRAW_TIMER_MAX;
-        draw_player_symbols();
-        UserApp1_pfStateMachine = Chess_Game_Debug;
-    }
+    draw_player_symbols();
+    UserApp1_pfStateMachine = return_state;
 }
 
+static void Chess_Game_Flash_Highlighted_Square(void) {
+    highlight_square(highlighted_square);
+    enqueue(&state_queue, &Chess_Game_Flash_Highlighted_Square);
+    UserApp1_pfStateMachine = return_state;
+}
 
-
-
-
-
-
-
-static void Chess_Game_Selecting_Direction(void) {
-    // Highlight items
-    if (highlighted_square_flash_timer == 0) {
-        highlight_square(highlighted_square);
-        highlighted_square_flash_timer = SQUARE_FLASH_RATE;
-        movement_arrow_flash_timer = ARROW_FLASH_RATE / 2;
-        return;
+static void Chess_Game_Flash_Movement_Indicator(void) {
+    flash_arrow();
+    if (return_state == Chess_Game_Selecting_Direction) {
+        enqueue(&state_queue, &Chess_Game_Flash_Movement_Indicator);
     }
-    else if (movement_arrow_flash_timer == 0){
-        flash_arrow();
-        movement_arrow_flash_timer = ARROW_FLASH_RATE;
-        highlighted_square_flash_timer = SQUARE_FLASH_RATE / 2;
-        return;
-    }
-    movement_arrow_flash_timer--;
-    highlighted_square_flash_timer--;
+    UserApp1_pfStateMachine = return_state;
+}
 
-    if (WasButtonPressed(BUTTON0)) {
-        ButtonAcknowledge(BUTTON0);
+static void Chess_Game_Move_Highlighted_Square_Part_1(void) {
+    draw_square(highlighted_square);
+    UserApp1_pfStateMachine = return_state;
+}
 
-        // Select next direction option
-        direction = (direction + 1) % DIRECTION_OPTIONS;
-        draw_movement_direction();
+static void Chess_Game_Move_Highlighted_Square_Part_2(void) {
+    if (ARE_SQUARES_EQUAL(selected_square, highlighted_square)) {
+        draw_selected_square_indicator(selected_square);
     }
-    else if (WasButtonPressed(BUTTON1)) {
-        ButtonAcknowledge(BUTTON1);
+    highlighted_square.row = (highlighted_square.row + DIRECTIONS[direction][0] + BOARD_SIZE) % BOARD_SIZE;
+    highlighted_square.col = (highlighted_square.col + DIRECTIONS[direction][1] + BOARD_SIZE) % BOARD_SIZE;
+    UserApp1_pfStateMachine = return_state;
+}
 
-        // Close direction selection menu
-        draw_movement_direction();
-        UserApp1_pfStateMachine = Chess_Game_Selecting_Square;
+static void Chess_Game_Deselect_Selected_Square(void) {
+    draw_square(selected_square);
+    selected_square.row = -1;
+    UserApp1_pfStateMachine = return_state;
+}
+
+static void Chess_Game_Attempt_Move(void) {
+    if (is_valid_move(selected_square, highlighted_square)) {
+        change_turn();
+        enqueue(&state_queue, &Chess_Game_Lift_Piece);
+        enqueue(&state_queue, &Chess_Game_Place_Piece);
+        enqueue(&state_queue, &Chess_Game_Update_Player_Symbols);
     }
-    else if (IsButtonHeld(BUTTON0, 2000)) {
-        // Resign game
-        resign();
-    }
+    enqueue(&state_queue, &Chess_Game_Deselect_Selected_Square);
+    UserApp1_pfStateMachine = return_state;
 }
 
 static void Chess_Game_Selecting_Square(void) {
-    // Highlight items
-    if (highlighted_square_flash_timer == 0) {
-        highlight_square(highlighted_square);
-        highlighted_square_flash_timer = SQUARE_FLASH_RATE;
-        movement_arrow_flash_timer = ARROW_FLASH_RATE / 2;
-        return;
+    draw_timer--;
+    if (draw_timer == 0) {
+        // Create queue of state function pointers
+        UserApp1_pfStateMachine = getFront(&state_queue);
+        dequeue(&state_queue);
+        draw_timer = DRAW_TIMER_MAX;
     }
-    highlighted_square_flash_timer--;
-
-    if (WasButtonPressed(BUTTON0)) {
+    else if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
 
         // Move highlighted square in the selected direction
-        draw_square(highlighted_square);
-        if (ARE_SQUARES_EQUAL(selected_square, highlighted_square)) {
-            draw_selected_square_indicator(selected_square);
-        }
-        highlighted_square.row = (highlighted_square.row + DIRECTIONS[direction][0] + BOARD_SIZE) % BOARD_SIZE;
-        highlighted_square.col = (highlighted_square.col + DIRECTIONS[direction][1] + BOARD_SIZE) % BOARD_SIZE;        
+        enqueue(&state_queue, &Chess_Game_Move_Highlighted_Square_Part_1);
+        enqueue(&state_queue, &Chess_Game_Move_Highlighted_Square_Part_2);      
     }
     else if (WasButtonPressed(BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
@@ -761,25 +758,55 @@ static void Chess_Game_Selecting_Square(void) {
         }
         else {
             // Attempt move
-            if (is_valid_move(selected_square, highlighted_square)) {
-                move_piece(selected_square, highlighted_square);
-                if (turn == WHITE) {
-                    turn = BLACK;
-                }
-                else {
-                    turn = WHITE;
-                }
-                draw_player_symbols();
-            }
-
-            // Deselect selected square
-            draw_square(selected_square);
-            selected_square.row = -1;
+            UserApp1_pfStateMachine = Chess_Game_Attempt_Move;
         }
     }
     else if (IsButtonHeld(BUTTON0, 500)) {
         // Open direction selection menu
-        UserApp1_pfStateMachine = Chess_Game_Selecting_Direction;
+        UserApp1_pfStateMachine = Chess_Game_Selecting_Direction; // Change state instantly to prevent further square selection input
+        return_state = Chess_Game_Selecting_Direction; // Update the return state so queued states do not switch back to this one
+        enqueue(&state_queue, &Chess_Game_Flash_Movement_Indicator); // Queue direction indicator flashing
+        draw_timer = DRAW_TIMER_MAX; // Reset timer to prevent rapid lcd changes when instantly changing to a new state
+    }
+}
+
+static void Chess_Game_Change_Movement_Direction(void) {
+    direction = (direction + 1) % DIRECTION_OPTIONS;
+    draw_movement_direction();
+    UserApp1_pfStateMachine = return_state;
+}
+
+static void Chess_Game_Close_Movement_Direction_Menu(void) {
+    draw_movement_direction();
+    UserApp1_pfStateMachine = return_state;
+}
+
+static void Chess_Game_Selecting_Direction(void) {
+    draw_timer--;
+    if (draw_timer == 0) {
+        // Create queue of state function pointers
+        UserApp1_pfStateMachine = getFront(&state_queue);
+        dequeue(&state_queue);
+        draw_timer = DRAW_TIMER_MAX;
+    }
+    else if (WasButtonPressed(BUTTON0)) {
+        ButtonAcknowledge(BUTTON0);
+
+        // Select next direction option
+        enqueue(&state_queue, &Chess_Game_Change_Movement_Direction);
+    }
+    else if (WasButtonPressed(BUTTON1)) {
+        ButtonAcknowledge(BUTTON1);
+
+        // Close direction selection menu
+        UserApp1_pfStateMachine = Chess_Game_Selecting_Square; // Change state instantly to prevent further direction selection menu input
+        return_state = Chess_Game_Selecting_Square; // Update the return state so queued states do not switch back to this one
+        enqueue(&state_queue, &Chess_Game_Close_Movement_Direction_Menu); // Queue state to redraw the direction indicator incase it is invisible
+        draw_timer = DRAW_TIMER_MAX; // Reset timer to prevent rapid lcd changes when instantly changing to a new state
+    }
+    else if (IsButtonHeld(BUTTON0, 2000)) {
+        // Resign game
+        resign();
     }
 }
 
