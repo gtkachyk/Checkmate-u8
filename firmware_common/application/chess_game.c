@@ -1,12 +1,22 @@
 #include "chess_app.h"
 
 static GameResult previous_result = RESULT_NONE;
+// static u8 board[8][8] = {
+//     {10, 8, 9, 11, 12, 9, 8, 10}, 
+//     {7, 7, 7, 7, 7, 7, 7, 7}, 
+//     {0, 0, 0, 0, 0, 0, 0, 0}, 
+//     {0, 0, 0, 0, 0, 0, 0, 0}, 
+//     {0, 0, 0, 0, 0, 0, 0, 0}, 
+//     {0, 0, 0, 0, 0, 0, 0, 0}, 
+//     {1, 1, 1, 1, 1, 1, 1, 1}, 
+//     {4, 2, 3, 5, 6, 3, 2, 4}
+// };
 static u8 board[8][8] = {
-    {10, 8, 9, 11, 12, 9, 8, 10}, 
-    {7, 7, 7, 7, 7, 7, 7, 7}, 
+    {10, 8, 9, 0, 12, 9, 8, 10}, 
+    {7, 7, 7, 7, 0, 7, 7, 7}, 
+    {0, 0, 0, 0, 7, 0, 0, 0}, 
     {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 11}, 
     {0, 0, 0, 0, 0, 0, 0, 0}, 
     {1, 1, 1, 1, 1, 1, 1, 1}, 
     {4, 2, 3, 5, 6, 3, 2, 4}
@@ -23,16 +33,59 @@ static Square white_king_square = {7, 4}; // Tracks the location of the white ki
 static Square black_king_square = {0, 4}; // Tracks the location of the black king
 static bool king_in_check = FALSE; // Tracks if the moving player's king is in check
 static bool attempting_special_pawn_move = FALSE;
-static bool attempting_en_passant = FALSE;
 static bool attempting_short_castle = FALSE;
 static bool attempting_long_castle = FALSE;
+static bool attempting_en_passant = FALSE;
 const int8_t DIRECTIONS[4][2] = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
 static MovementDirection direction = UP;
 static Square highlighted_square = {7, 0};
 static Square selected_square = {-1, -1};
+static uint8_t piece_cache;
+
+bool debug = TRUE;
+
+Square get_white_king_square() {
+    return white_king_square;
+}
+
+void set_white_king_square(Square new_square) {
+    white_king_square = new_square;
+}
+
+Square get_black_king_square() {
+    return black_king_square;
+}
+
+void set_black_king_square(Square new_square) {
+    black_king_square = new_square;
+}
 
 int8_t* get_direction_option(MovementDirection direction_option) {
     return DIRECTIONS[direction_option];
+}
+
+void set_attempting_special_pawn_move(bool new_status) {
+    attempting_special_pawn_move = new_status;
+}
+
+bool get_attempting_special_pawn_move() {
+    return attempting_special_pawn_move;
+}
+
+void set_attempting_short_castle(bool new_status) {
+    attempting_short_castle = new_status;
+}
+
+bool get_attempting_short_castle() {
+    return attempting_short_castle;
+}
+
+void set_attempting_long_castle(bool new_status) {
+    attempting_long_castle = new_status;
+}
+
+bool get_attempting_long_castle() {
+    return attempting_long_castle;
 }
 
 void set_attempting_en_passant(bool new_status) {
@@ -221,7 +274,6 @@ bool is_path_clear(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) {
     return TRUE;
 }
 
-// Debug message template: printf("Attempting to move <piece_name> on %c%c to %c%c...\n", file_index_to_notation(col_1), rank_index_to_notation(row_1), file_index_to_notation(col_2), rank_index_to_notation(row_2));
 bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) {
     // printf("piece_can_move called with row_1 = %u, col_1 = %u\n", row_1, col_1);
     if (!coordinates_are_valid(row_1, col_1) || !coordinates_are_valid(row_2, col_2)) return FALSE;
@@ -314,25 +366,58 @@ bool is_valid_move() {
     }
 }
 
+void move_selected_to_highlighted() {
+    piece_cache = board[highlighted_square.row][highlighted_square.col];
+    board[highlighted_square.row][highlighted_square.col] = board[selected_square.row][selected_square.col];
+    board[selected_square.row][selected_square.col] = EMPTY_SQUARE;
+}
+void undo_move_selected_to_highlighted() {
+    board[selected_square.row][selected_square.col] = board[highlighted_square.row][highlighted_square.col];
+    board[highlighted_square.row][highlighted_square.col] = piece_cache;
+}
+
 void reset_game_data() {
-    previous_result = RESULT_NONE;
-    reset_board();
-    turn = WHITE;
-    white_pawns_special_move_status = 0xFF;
-    black_pawns_special_move_status = 0xFF;
-    white_has_short_castle_privileges = TRUE;
-    black_has_short_castle_privileges = TRUE;
-    white_has_long_castle_privileges = TRUE;
-    black_has_long_castle_privileges = TRUE;
-    en_passantable_square = (Square){.row = -1, .col = -1};
-    white_king_square = (Square){.row = 7, .col = 4}; // Tracks the location of the white king
-    black_king_square = (Square){.row = 0, .col = 4}; // Tracks the location of the black king
-    king_in_check = FALSE; // Tracks if the moving player's king is in check
-    attempting_special_pawn_move = FALSE;
-    attempting_en_passant = FALSE;
-    attempting_short_castle = FALSE;
-    attempting_long_castle = FALSE;
-    direction = UP;
-    highlighted_square = (Square){.row = 7, .col = 0};
-    selected_square = (Square){.row = -1, .col = -1};
+    if (!debug) {
+        previous_result = RESULT_NONE;
+        reset_board();
+        turn = WHITE;
+        white_pawns_special_move_status = 0xFF;
+        black_pawns_special_move_status = 0xFF;
+        white_has_short_castle_privileges = TRUE;
+        black_has_short_castle_privileges = TRUE;
+        white_has_long_castle_privileges = TRUE;
+        black_has_long_castle_privileges = TRUE;
+        en_passantable_square = (Square){.row = -1, .col = -1};
+        white_king_square = (Square){.row = 7, .col = 4}; // Tracks the location of the white king
+        black_king_square = (Square){.row = 0, .col = 4}; // Tracks the location of the black king
+        king_in_check = FALSE; // Tracks if the moving player's king is in check
+        attempting_special_pawn_move = FALSE;
+        attempting_en_passant = FALSE;
+        attempting_short_castle = FALSE;
+        attempting_long_castle = FALSE;
+        direction = UP;
+        highlighted_square = (Square){.row = 7, .col = 0};
+        selected_square = (Square){.row = -1, .col = -1};
+    }
+    else {
+        previous_result = RESULT_NONE;
+        turn = WHITE;
+        white_pawns_special_move_status = 0xFF;
+        black_pawns_special_move_status = 0xFF;
+        white_has_short_castle_privileges = TRUE;
+        black_has_short_castle_privileges = TRUE;
+        white_has_long_castle_privileges = TRUE;
+        black_has_long_castle_privileges = TRUE;
+        en_passantable_square = (Square){.row = -1, .col = -1};
+        white_king_square = (Square){.row = 7, .col = 4}; // Tracks the location of the white king
+        black_king_square = (Square){.row = 0, .col = 4}; // Tracks the location of the black king
+        king_in_check = FALSE; // Tracks if the moving player's king is in check
+        attempting_special_pawn_move = FALSE;
+        attempting_en_passant = FALSE;
+        attempting_short_castle = FALSE;
+        attempting_long_castle = FALSE;
+        direction = UP;
+        highlighted_square = (Square){.row = 6, .col = 5};
+        selected_square = (Square){.row = -1, .col = -1};
+    }
 }

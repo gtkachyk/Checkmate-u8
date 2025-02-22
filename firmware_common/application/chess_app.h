@@ -67,6 +67,8 @@ static void Chess_Game_Flash_Movement_Indicator(void);
 static void Chess_Game_Move_Highlighted_Square_Part_1(void);
 static void Chess_Game_Move_Highlighted_Square_Part_2(void);
 static void Chess_Game_Attempt_Move(void);
+static void Chess_Game_Validate_Move_Part_1(void);
+static void Chess_Game_Validate_Move_Part_2(void);
 static void Chess_Game_Deselect_Selected_Square(void);
 static void Chess_Game_Change_Movement_Direction(void);
 static void Chess_Game_Close_Movement_Direction_Menu(void);
@@ -97,7 +99,17 @@ void draw_board();
 void draw_game_interface();
 
 /* chess_game.c */
+Square get_white_king_square();
+void set_white_king_square(Square new_square);
+Square get_black_king_square();
+void set_black_king_square(Square new_square);
 int8_t* get_direction_option(MovementDirection direction_option);
+void set_attempting_special_pawn_move(bool new_status);
+bool get_attempting_special_pawn_move();
+void set_attempting_short_castle(bool new_status);
+bool get_attempting_short_castle();
+void set_attempting_long_castle(bool new_status);
+bool get_attempting_long_castle();
 void set_attempting_en_passant(bool new_status);
 bool get_attempting_en_passant();
 void set_white_pawn_special_move_status(uint8_t file, bool new_status);
@@ -133,6 +145,8 @@ void change_turn();
 bool is_path_clear(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2);
 bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2);
 bool is_valid_move();
+void move_selected_to_highlighted();
+void undo_move_selected_to_highlighted();
 void reset_game_data();
 
 /* Macros */
