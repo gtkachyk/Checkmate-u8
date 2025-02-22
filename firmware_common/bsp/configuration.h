@@ -100,7 +100,7 @@ Includes
 #include "blade_api.h"
 #include "debug.h"
 #include "music.h"
-#include "user_app1.h"
+#include "chess_app.h"
 #include "user_app2.h"
 #include "user_app3.h"
 

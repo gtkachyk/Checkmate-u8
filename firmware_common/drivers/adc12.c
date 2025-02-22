@@ -95,7 +95,7 @@ Example:
 
 void UserApp_AdcCallback(u16 u16Result_);
 
-void UserApp1Initialize(void)
+void ChessAppInitialize(void)
 {
  Adc12AssignCallback(ADC12_BLADE_AN0, UserApp_AdcCallback);
 }

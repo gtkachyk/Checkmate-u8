@@ -89,7 +89,7 @@ int main(void)
  
   /* Application initialization */
   BladeApiInitialize();
-  UserApp1Initialize();
+  ChessAppInitialize();
   UserApp2Initialize();
   UserApp3Initialize();
 
@@ -129,7 +129,7 @@ int main(void)
 
     /* Applications */
     BladeApiRunActiveState();
-    UserApp1RunActiveState();
+    ChessAppRunActiveState();
     UserApp2RunActiveState();
     UserApp3RunActiveState();
         
