@@ -114,15 +114,8 @@ void draw_menu(GameResult previous_result, Colour turn) {
         LcdLoadString("resignation!", LCD_FONT_SMALL, &sTargetPixel);
     }
     else if (previous_result == RESULT_DRAW) {
-        LcdLoadString("Draw accepted by", LCD_FONT_SMALL, &sTargetPixel);
-        sTargetPixel.u16PixelRowAddress = 45;
-        sTargetPixel.u16PixelColumnAddress = 35;
-        if (turn == BLACK) {
-            LcdLoadString("black.", LCD_FONT_SMALL, &sTargetPixel);
-        }
-        else {
-            LcdLoadString("white.", LCD_FONT_SMALL, &sTargetPixel);
-        }
+        sTargetPixel.u16PixelColumnAddress = 52;
+        LcdLoadString("Draw", LCD_FONT_SMALL, &sTargetPixel);
     }
 }
 
