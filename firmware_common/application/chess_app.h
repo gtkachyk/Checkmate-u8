@@ -22,6 +22,7 @@ typedef enum {
 } MovementDirection;
 
 typedef enum {
+    NO_COLOUR = -1,
     BLACK = 0,
     WHITE = 1,
 } Colour;
@@ -63,23 +64,25 @@ void ChessAppRunActiveState(void);
 
 /* State Machine Declarations */
 static void Chess_Menu(void);
-static void Chess_Game_Selecting_Direction(void);
-static void Chess_Game_Selecting_Square(void);
-static void Chess_Game_Lift_Piece(void);
-static void Chess_Game_Place_Piece(void);
-static void Chess_Game_Update_Player_Symbols(void);
-static void Chess_Game_Flash_Highlighted_Square(void);
-static void Chess_Game_Flash_Movement_Indicator(void);
-static void Chess_Game_Move_Highlighted_Square_Part_1(void);
-static void Chess_Game_Move_Highlighted_Square_Part_2(void);
-static void Chess_Game_Attempt_Move(void);
-static void Chess_Game_Validate_Piece_Movement(void);
-static void Chess_Game_Validate_Check_Status(void);
-static void Chess_Game_Deselect_Selected_Square(void);
-static void Chess_Game_Change_Movement_Direction(void);
-static void Chess_Game_Find_Valid_Move(void);
-static void Chess_Game_Close_Movement_Direction_Menu(void);
-static void Chess_Game_Selecting_Square(void);
+static void Selecting_Direction(void);
+static void Selecting_Square(void);
+static void Lift_Piece(void);
+static void Place_Piece(void);
+static void Update_Player_Symbols(void);
+static void Flash_Highlighted_Square(void);
+static void Flash_Movement_Indicator(void);
+static void Move_Highlighted_Square_Part_1(void);
+static void Move_Highlighted_Square_Part_2(void);
+static void Validate_Move_Castle_Through_Check(void);
+static void Validate_Move_Piece_Movement(void);
+static void Validate_Move_Self_Inflicted_Check(void);
+static void Deselect_Selected_Square(void);
+static void Change_Movement_Direction(void);
+static void Post_Move_Check_Is_In_Check(void);
+static void Post_Move_Check_Has_Valid_Move(void);
+static void Post_Move_Check_Is_Sufficient_Material(void);
+static void Close_Movement_Direction_Menu(void);
+static void Selecting_Square(void);
 static void ChessAppSM_Error(void);
 
 /* chess_utils.c */
@@ -104,6 +107,7 @@ void draw_square(Square square, uint8_t content);
 void draw_pieces();
 void draw_board();
 void draw_game_interface();
+void set_check_indicator();
 
 /* chess_game.c */
 Move get_move_to_make();
@@ -159,9 +163,10 @@ void move_start_to_end();
 void undo_move_start_to_end();
 void reset_game_data();
 bool get_king_in_check();
-bool set_king_in_check(bool status);
+void set_king_in_check(bool status);
 bool get_has_valid_move();
-bool set_has_valid_move(bool status);
+void set_has_valid_move(bool status);
+bool insufficient_material();
 
 /* Macros */
 #define IS_SQUARE_NULL(s) ((s).row == -1)

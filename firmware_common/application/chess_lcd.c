@@ -99,7 +99,7 @@ void draw_menu(GameResult previous_result, Colour turn) {
             LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
         }
         sTargetPixel.u16PixelRowAddress = 45;
-        sTargetPixel.u16PixelColumnAddress = 32;
+        sTargetPixel.u16PixelColumnAddress = 35;
         LcdLoadString("checkmate!", LCD_FONT_SMALL, &sTargetPixel);
     }
     else if (previous_result == RESULT_RESIGNATION) {
@@ -117,6 +117,7 @@ void draw_menu(GameResult previous_result, Colour turn) {
         sTargetPixel.u16PixelColumnAddress = 52;
         LcdLoadString("Draw", LCD_FONT_SMALL, &sTargetPixel);
     }
+    set_check_indicator();
 }
 
 void draw_player_symbols(Colour turn) {
@@ -257,4 +258,14 @@ void draw_game_interface() {
     draw_player_symbols(get_turn());
     draw_turn_symbol();
     draw_movement_symbol();
+    set_check_indicator();
+}
+
+void set_check_indicator() {
+    if (get_king_in_check()) {
+        LedOn(RED3);
+    }
+    else {
+        LedOff(RED3);
+    }
 }

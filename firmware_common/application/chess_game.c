@@ -12,48 +12,15 @@ static GameResult previous_result = RESULT_NONE;
 //     {4, 2, 3, 5, 6, 3, 2, 4}
 // };
 
-// static u8 board[8][8] = {
-//     {10, 8, 9, 0, 12, 9, 8, 10}, 
-//     {7, 7, 7, 7, 0, 7, 7, 7}, 
-//     {0, 0, 0, 0, 7, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 11}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {1, 1, 1, 1, 1, 1, 1, 1}, 
-//     {4, 2, 3, 5, 6, 3, 2, 4}
-// };
-
-// static u8 board[8][8] = {
-//     {10, 0, 0, 0, 12, 0, 0, 10}, 
-//     {7, 7, 7, 7, 7, 7, 7, 7}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {1, 1, 1, 1, 1, 1, 1, 1}, 
-//     {4, 0, 0, 0, 6, 0, 0, 4}
-// };
-
-// static u8 board[8][8] = {
-//     {10, 8, 9, 11, 12, 9, 8, 10}, 
-//     {7, 7, 7, 7, 7, 7, 7, 7}, 
-//     {9, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {1, 1, 1, 1, 0, 1, 1, 1}, 
-//     {4, 2, 3, 5, 6, 0, 0, 4}
-// };
-
 static u8 board[8][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 12}, 
-    {0, 0, 0, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 6, 0}, 
+    {0, 0, 0, 0, 12, 0, 0, 0}, 
     {0, 0, 0, 0, 0, 0, 0, 0}, 
     {0, 0, 0, 0, 0, 0, 0, 0}, 
     {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {11, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 2, 0, 6, 0, 0, 0}
 };
 
 static Colour turn = WHITE;
@@ -85,7 +52,7 @@ bool get_has_valid_move() {
     return has_valid_move;
 }
 
-bool set_has_valid_move(bool status) {
+void set_has_valid_move(bool status) {
     has_valid_move = status;
 }
 
@@ -93,7 +60,7 @@ bool get_king_in_check() {
     return king_in_check;
 }
 
-bool set_king_in_check(bool status) {
+void set_king_in_check(bool status) {
     king_in_check = status;
 }
 
@@ -340,6 +307,7 @@ bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) 
     if (!coordinates_are_valid(row_1, col_1) || !coordinates_are_valid(row_2, col_2)) return FALSE;
     uint8_t piece = get_square_content(col_1, row_1);
     uint8_t destination_square = get_square_content(col_2, row_2);
+    if (get_piece_colour(piece) != turn) return FALSE;
     if (get_piece_colour(piece) == get_piece_colour(destination_square)) return FALSE;
     if (piece == EMPTY_SQUARE) return FALSE;
 
@@ -438,11 +406,51 @@ void move_start_to_end() {
     piece_cache = board[move_to_make.end.row][move_to_make.end.col];
     board[move_to_make.end.row][move_to_make.end.col] = board[move_to_make.start.row][move_to_make.start.col];
     board[move_to_make.start.row][move_to_make.start.col] = EMPTY_SQUARE;
+
+    // Update king location
     if (board[move_to_make.end.row][move_to_make.end.col] == WHITE_KING) {
         white_king_square = (Square){.col = move_to_make.end.col, .row = move_to_make.end.row};
     }
     else if (board[move_to_make.end.row][move_to_make.end.col] == BLACK_KING) {
         black_king_square = (Square){.col = move_to_make.end.col, .row = move_to_make.end.row};
+    }
+    
+    // Special moves
+    if (attempting_special_pawn_move) {
+        if (turn == WHITE) {
+            set_white_pawn_special_move_status(move_to_make.end.col, FALSE);
+        }
+        else {
+            set_black_pawn_special_move_status(move_to_make.end.col, FALSE);
+        }
+    }
+    else if (attempting_short_castle) {
+        if (turn == WHITE) {
+            board[ONE][F] = board[ONE][H];
+            board[ONE][H] = EMPTY_SQUARE;
+            white_has_short_castle_privileges = FALSE;
+        }
+        else {
+            board[EIGHT][F] = board[EIGHT][H];
+            board[EIGHT][H] = EMPTY_SQUARE;
+            black_has_short_castle_privileges = FALSE;
+        }
+    }
+    else if (attempting_long_castle) {
+        if (turn == WHITE) {
+            board[ONE][D] = board[ONE][A];
+            board[ONE][A] = EMPTY_SQUARE;
+            white_has_long_castle_privileges = FALSE;
+        }
+        else {
+            board[EIGHT][D] = board[EIGHT][A];
+            board[EIGHT][A] = EMPTY_SQUARE;
+            black_has_long_castle_privileges = FALSE;
+        }
+    }
+    else if (attempting_en_passant) {
+        board[move_to_make.start.row][move_to_make.end.col] = EMPTY_SQUARE;
+        set_en_passantable_square((Square){.col = -1, .row = -1});
     }
 }
 void undo_move_start_to_end() {
@@ -454,6 +462,88 @@ void undo_move_start_to_end() {
     else if (board[move_to_make.start.row][move_to_make.start.col] == BLACK_KING) {
         black_king_square = (Square){.col = move_to_make.start.col, .row = move_to_make.start.row};
     }
+
+    // Special moves
+    if (attempting_special_pawn_move) {
+        if (turn == WHITE) {
+            set_white_pawn_special_move_status(move_to_make.end.col, TRUE);
+        }
+        else {
+            set_black_pawn_special_move_status(move_to_make.end.col, TRUE);
+        }
+    }
+    else if (attempting_short_castle) {
+        if (turn == WHITE) {
+            board[ONE][H] = board[ONE][F];
+            board[ONE][F] = EMPTY_SQUARE;
+            white_has_short_castle_privileges = TRUE;
+        }
+        else {
+            board[EIGHT][H] = board[EIGHT][F];
+            board[EIGHT][F] = EMPTY_SQUARE;
+            black_has_short_castle_privileges = TRUE;
+        }
+    }
+    else if (attempting_long_castle) {
+        if (turn == WHITE) {
+            board[ONE][A] = board[ONE][D];
+            board[ONE][D] = EMPTY_SQUARE;
+            white_has_long_castle_privileges = TRUE;
+        }
+        else {
+            board[EIGHT][A] = board[EIGHT][D];
+            board[EIGHT][D] = EMPTY_SQUARE;
+            black_has_long_castle_privileges = TRUE;
+        }
+    }
+    else if (attempting_en_passant) {
+        if (turn == WHITE) {
+            board[move_to_make.start.row][move_to_make.end.col] = BLACK_PAWN;
+        }
+        else {
+            board[move_to_make.start.row][move_to_make.end.col] = WHITE_PAWN;
+        }
+        set_en_passantable_square((Square){.col = move_to_make.end.col, .row = move_to_make.start.row});
+    }
+}
+
+bool insufficient_material() {
+    uint8_t white_bishop_count = 0;
+    Square white_bishop_square = {-1, -1};
+    uint8_t white_knight_count = 0;
+    uint8_t black_bishop_count = 0;
+    Square black_bishop_square = {-1, -1};
+    uint8_t black_knight_count = 0;
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            uint8_t piece = board[i][j];
+            if (piece != EMPTY_SQUARE) {
+                if (piece == WHITE_PAWN || piece == BLACK_PAWN || piece == WHITE_ROOK || piece == BLACK_ROOK || piece == WHITE_QUEEN || piece == BLACK_QUEEN) {
+                    return FALSE;
+                }
+                else if (piece == WHITE_BISHOP) {
+                    white_bishop_count++;
+                    white_bishop_square = (Square){.col = j, .row = i};
+                }
+                else if (piece == WHITE_KNIGHT) {
+                    white_knight_count++;
+                }
+                else if (piece == BLACK_BISHOP) {
+                    black_bishop_count++;
+                    black_bishop_square = (Square){.col = j, .row = i};
+                }
+                else if (piece == BLACK_KNIGHT) {
+                    black_knight_count++;
+                }
+            }
+        }
+    }
+    if ((white_knight_count > 1 || black_knight_count > 1) || 
+        (white_bishop_count + white_knight_count > 1 || black_bishop_count + black_knight_count > 1) ||
+        (white_bishop_count == 1 && black_bishop_count == 1 && get_square_colour(white_bishop_square.row, white_bishop_square.col) != get_square_colour(black_bishop_square.row, black_bishop_square.col))) {
+        return FALSE;
+    }
+    return TRUE;
 }
 
 void reset_game_data() {
@@ -489,15 +579,15 @@ void reset_game_data() {
         white_has_long_castle_privileges = TRUE;
         black_has_long_castle_privileges = TRUE;
         en_passantable_square = (Square){.row = -1, .col = -1};
-        white_king_square = (Square){.row = 3, .col = 6}; // Tracks the location of the white king
-        black_king_square = (Square){.row = 0, .col = 7}; // Tracks the location of the black king
-        king_in_check = FALSE; // Tracks if the moving player's king is in check
+        white_king_square = (Square){.row = ONE, .col = E};
+        black_king_square = (Square){.row = EIGHT, .col = E}; 
+        king_in_check = FALSE;
         attempting_special_pawn_move = FALSE;
         attempting_en_passant = FALSE;
         attempting_short_castle = FALSE;
         attempting_long_castle = FALSE;
-        direction = UP;
-        highlighted_square = (Square){.col = G, .row = FIVE};
+        direction = LEFT;
+        highlighted_square = (Square){.col = C, .row = ONE};
         selected_square = (Square){.row = -1, .col = -1};
     }
 }
