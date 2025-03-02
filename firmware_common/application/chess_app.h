@@ -39,7 +39,6 @@ typedef struct {
 
 typedef struct Node {
     fnCode_type data;
-    // uint8_t priority;
     struct Node* next;
 } Node;
 
@@ -81,6 +80,8 @@ static void Change_Movement_Direction(void);
 static void Post_Move_Check_Is_In_Check(void);
 static void Post_Move_Check_Has_Valid_Move(void);
 static void Post_Move_Check_Is_Sufficient_Material(void);
+static void Post_Move_Check_Is_Draw_By_Repetition(void);
+static void Remove_EnPassantable_Piece(void);
 static void Close_Movement_Direction_Menu(void);
 static void Selecting_Square(void);
 static void ChessAppSM_Error(void);
@@ -89,6 +90,7 @@ static void ChessAppSM_Error(void);
 void print_str (u8 str[]);
 void print_str_var (u8 name[], u8 val[]);
 void print_int_var (u8 name[], u32 val);
+void print_square(u8 name[], Square square);
 
 /* chess_lcd.c */
 void flash_arrow(MovementDirection direction);
@@ -110,6 +112,8 @@ void draw_game_interface();
 void set_check_indicator();
 
 /* chess_game.c */
+void set_attempting_promotion(bool new_status);
+bool get_attempting_promotion();
 Move get_move_to_make();
 void set_move_to_make(Move move);
 Square get_white_king_square();
@@ -167,6 +171,9 @@ void set_king_in_check(bool status);
 bool get_has_valid_move();
 void set_has_valid_move(bool status);
 bool insufficient_material();
+bool draw_by_repetition();
+void push_to_last_eight_moves(Move move);
+Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_row);
 
 /* Macros */
 #define IS_SQUARE_NULL(s) ((s).row == -1)
@@ -224,6 +231,8 @@ bool insufficient_material();
 
 #define WHITE_PAWN_START_RANK 6
 #define BLACK_PAWN_START_RANK 1
+
+#define DIRECTION_SELECTION_BUTTON 2
 
 /* Bitmaps */
 /*** Selected Square ***/

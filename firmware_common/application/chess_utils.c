@@ -20,3 +20,9 @@ void print_str (u8 str[]) {
     DebugPrintf(str);
     DebugLineFeed();
 }
+
+void print_square(u8 name[], Square square) {
+    print_str(name);
+    print_int_var("col", square.col);
+    print_int_var("row", square.row);
+}

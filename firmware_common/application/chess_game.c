@@ -1,27 +1,27 @@
 #include "chess_app.h"
 
 static GameResult previous_result = RESULT_NONE;
+static u8 board[8][8] = {
+    {10, 8, 9, 11, 12, 9, 8, 10}, 
+    {7, 7, 7, 7, 7, 7, 7, 7}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {0, 0, 0, 0, 0, 0, 0, 0}, 
+    {1, 1, 1, 1, 1, 1, 1, 1}, 
+    {4, 2, 3, 5, 6, 3, 2, 4}
+};
+
 // static u8 board[8][8] = {
 //     {10, 8, 9, 11, 12, 9, 8, 10}, 
-//     {7, 7, 7, 7, 7, 7, 7, 7}, 
+//     {0, 7, 7, 7, 7, 7, 7, 7}, 
+//     {7, 0, 0, 0, 0, 0, 0, 0}, 
+//     {0, 0, 0, 1, 0, 0, 0, 0}, 
 //     {0, 0, 0, 0, 0, 0, 0, 0}, 
 //     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {1, 1, 1, 1, 1, 1, 1, 1}, 
+//     {1, 1, 1, 0, 1, 1, 1, 1}, 
 //     {4, 2, 3, 5, 6, 3, 2, 4}
 // };
-
-static u8 board[8][8] = {
-    {0, 0, 0, 0, 12, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 0, 0, 0, 0, 0, 0}, 
-    {11, 0, 0, 0, 0, 0, 0, 0}, 
-    {0, 0, 2, 0, 6, 0, 0, 0}
-};
 
 static Colour turn = WHITE;
 static uint8_t white_pawns_special_move_status = 0xFF;
@@ -31,13 +31,14 @@ static bool black_has_short_castle_privileges = TRUE;
 static bool white_has_long_castle_privileges = TRUE;
 static bool black_has_long_castle_privileges = TRUE;
 static Square en_passantable_square = {-1, -1};
-static Square white_king_square = {7, 4}; // Tracks the location of the white king
-static Square black_king_square = {0, 4}; // Tracks the location of the black king
+static Square white_king_square = {ONE, E}; // Tracks the location of the white king
+static Square black_king_square = {EIGHT, E}; // Tracks the location of the black king
 static bool king_in_check = FALSE; // Tracks if the moving player's king is in check
 static bool attempting_special_pawn_move = FALSE;
 static bool attempting_short_castle = FALSE;
 static bool attempting_long_castle = FALSE;
 static bool attempting_en_passant = FALSE;
+static bool attempting_promotion = FALSE;
 const int8_t DIRECTIONS[4][2] = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
 static MovementDirection direction = UP;
 static Square highlighted_square = {7, 0};
@@ -45,8 +46,48 @@ static Square selected_square = {-1, -1};
 static uint8_t piece_cache;
 static Move move_to_make;
 static bool has_valid_move = FALSE;
+static Move last_eight_moves[8];
 
-bool debug = TRUE;
+static bool debug = FALSE;
+
+void set_attempting_promotion(bool new_status) {
+    attempting_promotion = new_status;
+}
+
+bool get_attempting_promotion() {
+    return attempting_promotion;
+}
+
+bool are_moves_equal(Move move_1, Move move_2) {
+    return move_1.start.col == move_2.start.col && move_1.start.row == move_2.start.row && move_1.end.col == move_2.end.col && move_1.end.row == move_2.end.row;
+}
+
+Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_row) {
+    return (Move){.start = (Square){.col = start_col, .row = start_row}, .end = (Square){.col = end_col, .row = end_row}};
+}
+
+void push_to_last_eight_moves(Move move) {
+    for (int i = 7; i <= 0; i--) {
+        if (last_eight_moves[i].start.row == -1) {
+            last_eight_moves[i] = move;
+            return;
+        }
+    }
+    last_eight_moves[7] = last_eight_moves[6];
+    last_eight_moves[6] = last_eight_moves[5];
+    last_eight_moves[5] = last_eight_moves[4];
+    last_eight_moves[4] = last_eight_moves[3];
+    last_eight_moves[3] = last_eight_moves[2];
+    last_eight_moves[2] = last_eight_moves[1];
+    last_eight_moves[1] = last_eight_moves[0];
+    last_eight_moves[0] = move;
+}
+
+void initialize_last_eight_moves() {
+    for (int i = 0; i < 8; i++) {
+        last_eight_moves[i] = create_move(-1, -1, -1, -1);
+    }
+}
 
 bool get_has_valid_move() {
     return has_valid_move;
@@ -125,7 +166,7 @@ bool get_attempting_en_passant() {
 }
 
 void set_white_pawn_special_move_status(uint8_t file, bool new_status) {
-    white_pawns_special_move_status = white_pawns_special_move_status | (new_status << file);
+    white_pawns_special_move_status = white_pawns_special_move_status ^ (1 << file);
 }
 
 bool get_white_pawn_special_move_status(uint8_t file) {
@@ -133,7 +174,7 @@ bool get_white_pawn_special_move_status(uint8_t file) {
 }
 
 void set_black_pawn_special_move_status(uint8_t file, bool new_status) {
-    black_pawns_special_move_status = black_pawns_special_move_status | (new_status << file);
+    black_pawns_special_move_status = black_pawns_special_move_status ^ (1 << file);
 }
 
 bool get_black_pawn_special_move_status(uint8_t file) {
@@ -141,7 +182,7 @@ bool get_black_pawn_special_move_status(uint8_t file) {
 }
 
 Square get_en_passantable_square() {
-    return highlighted_square;
+    return en_passantable_square;
 }
 
 void set_en_passantable_square(Square new_en_passantable_square) {
@@ -287,6 +328,10 @@ void reset_board() {
     board[7][7] = 4;
 }
 
+bool squares_have_opposite_colour_pieces(Square square_1, Square square_2) {
+    return get_piece_colour(get_square_content(square_1.col, square_1.row)) == !get_piece_colour(get_square_content(square_2.col, square_2.row));
+}
+
 bool is_path_clear(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) {
     int8_t row_dir = (row_2 > row_1) - (row_2 < row_1); // -1, 0, or 1
     int8_t col_dir = (col_2 > col_1) - (col_2 < col_1);
@@ -314,28 +359,32 @@ bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) 
     int8_t row_change = row_2 - row_1;
     int8_t col_change = col_2 - col_1;
     if (piece == WHITE_PAWN || piece == BLACK_PAWN) {
-        int pawn_direction = (piece == WHITE_PAWN) ? -1 : 1;
+        int8_t pawn_direction = (piece == WHITE_PAWN) ? -1 : 1;
         if (row_2 == row_1 + pawn_direction && col_2 == col_1 && destination_square == EMPTY_SQUARE) {
             // Standard move
             return TRUE;
         }
         else if (row_2 == row_1 + pawn_direction && abs(col_2 - col_1) == 1) {
             // Capture
-            if (get_piece_colour(destination_square) == BLACK) {
+            if (squares_have_opposite_colour_pieces((Square){.col = col_1, .row = row_1}, (Square){.col = col_2, .row = row_2})) {
                 // Standard
                 return TRUE;
             }
-            else if (destination_square == EMPTY_SQUARE && get_en_passantable_square().row == row_1 && get_en_passantable_square().col == col_2 && get_square_content(col_2, row_1) == BLACK_PAWN) {
+            else if (destination_square == EMPTY_SQUARE && ARE_SQUARES_EQUAL(((Square){.col = col_2, .row = row_1}), get_en_passantable_square()) && squares_have_opposite_colour_pieces((Square){.col = col_1, .row = row_1}, (Square){.col = col_2, .row = row_1})) {
                 // En passant
                 attempting_en_passant = TRUE;
                 return TRUE;
             }
         }
-        else if (row_2 == row_1 + pawn_direction*2 && col_2 == col_1 && destination_square == EMPTY_SQUARE && get_square_content(col_1, row_1 + pawn_direction) == EMPTY_SQUARE && get_white_pawn_special_move_status(col_1)) {
+        else if (row_2 == row_1 + pawn_direction*2 && col_2 == col_1 && destination_square == EMPTY_SQUARE && get_square_content(col_1, row_1 + pawn_direction) == EMPTY_SQUARE && ((turn == WHITE && get_white_pawn_special_move_status(col_1)) || (turn == BLACK && get_black_pawn_special_move_status(col_1)))) {
             // Special move
+            set_en_passantable_square((Square){.row = row_2, .col = col_2});
             attempting_special_pawn_move = TRUE;
             return TRUE;
         }
+        // print_int_var("condition_1", row_2 == row_1 + pawn_direction);
+        // print_int_var("condition_2", col_2 == col_1);
+        // print_int_var("condition_3", destination_square == EMPTY_SQUARE);
     }
     else if (piece == WHITE_KNIGHT || piece == BLACK_KNIGHT) {
         if (((abs(row_2 - row_1) == 2 && abs(col_2 - col_1) == 1) || (abs(row_2 - row_1) == 1 && abs(col_2 - col_1) == 2))) {
@@ -546,6 +595,10 @@ bool insufficient_material() {
     return TRUE;
 }
 
+bool draw_by_repetition() {
+    return are_moves_equal(last_eight_moves[0], last_eight_moves[4]) && are_moves_equal(last_eight_moves[1], last_eight_moves[5]) && are_moves_equal(last_eight_moves[2], last_eight_moves[6]) && are_moves_equal(last_eight_moves[3], last_eight_moves[7]);
+}
+
 void reset_game_data() {
     if (!debug) {
         previous_result = RESULT_NONE;
@@ -558,20 +611,22 @@ void reset_game_data() {
         white_has_long_castle_privileges = TRUE;
         black_has_long_castle_privileges = TRUE;
         en_passantable_square = (Square){.row = -1, .col = -1};
-        white_king_square = (Square){.row = 7, .col = 4}; // Tracks the location of the white king
-        black_king_square = (Square){.row = 0, .col = 4}; // Tracks the location of the black king
+        white_king_square = (Square){.row = 7, .col = 4};
+        black_king_square = (Square){.row = 0, .col = 4};
         king_in_check = FALSE; // Tracks if the moving player's king is in check
         attempting_special_pawn_move = FALSE;
         attempting_en_passant = FALSE;
         attempting_short_castle = FALSE;
         attempting_long_castle = FALSE;
+        attempting_promotion = FALSE;
         direction = UP;
         highlighted_square = (Square){.row = 7, .col = 0};
         selected_square = (Square){.row = -1, .col = -1};
+        initialize_last_eight_moves();
     }
     else {
         previous_result = RESULT_NONE;
-        turn = WHITE;
+        turn = BLACK;
         white_pawns_special_move_status = 0xFF;
         black_pawns_special_move_status = 0xFF;
         white_has_short_castle_privileges = TRUE;
@@ -579,15 +634,17 @@ void reset_game_data() {
         white_has_long_castle_privileges = TRUE;
         black_has_long_castle_privileges = TRUE;
         en_passantable_square = (Square){.row = -1, .col = -1};
-        white_king_square = (Square){.row = ONE, .col = E};
-        black_king_square = (Square){.row = EIGHT, .col = E}; 
+        white_king_square = (Square){.row = 7, .col = 4};
+        black_king_square = (Square){.row = 0, .col = 4};
         king_in_check = FALSE;
         attempting_special_pawn_move = FALSE;
         attempting_en_passant = FALSE;
         attempting_short_castle = FALSE;
         attempting_long_castle = FALSE;
-        direction = LEFT;
-        highlighted_square = (Square){.col = C, .row = ONE};
+        attempting_promotion = FALSE;
+        direction = DOWN;
+        highlighted_square = (Square){.col = E, .row = SEVEN};
         selected_square = (Square){.row = -1, .col = -1};
+        initialize_last_eight_moves();
     }
 }
