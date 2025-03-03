@@ -22,6 +22,14 @@ typedef enum {
 } MovementDirection;
 
 typedef enum {
+    KNIGHT = 0,
+    BISHOP = 1,
+    ROOK = 2,
+    QUEEN = 3, 
+    NO_PROMOTION = 4
+} PromotionOption;
+
+typedef enum {
     NO_COLOUR = -1,
     BLACK = 0,
     WHITE = 1,
@@ -35,6 +43,7 @@ typedef struct {
 typedef struct {
     Square start;
     Square end;
+    PromotionOption promotion_selection;
 } Move;
 
 typedef struct Node {
@@ -82,7 +91,10 @@ static void Post_Move_Check_Has_Valid_Move(void);
 static void Post_Move_Check_Is_Sufficient_Material(void);
 static void Post_Move_Check_Is_Draw_By_Repetition(void);
 static void Remove_EnPassantable_Piece(void);
+static void Change_Promotion_Option(void);
+static void Selecting_Promotion(void);
 static void Close_Movement_Direction_Menu(void);
+static void Set_Promotion_Square(void);
 static void Selecting_Square(void);
 static void ChessAppSM_Error(void);
 
@@ -91,6 +103,8 @@ void print_str (u8 str[]);
 void print_str_var (u8 name[], u8 val[]);
 void print_int_var (u8 name[], u32 val);
 void print_square(u8 name[], Square square);
+void print_state();
+void print_move(u8 name[], Move move);
 
 /* chess_lcd.c */
 void flash_arrow(MovementDirection direction);
@@ -112,6 +126,9 @@ void draw_game_interface();
 void set_check_indicator();
 
 /* chess_game.c */
+uint8_t* get_promotion_option(PromotionOption promotion_option, Colour turn);
+PromotionOption get_promotion();
+void set_promotion(PromotionOption new_promotion);
 void set_attempting_promotion(bool new_status);
 bool get_attempting_promotion();
 Move get_move_to_make();
@@ -173,7 +190,7 @@ void set_has_valid_move(bool status);
 bool insufficient_material();
 bool draw_by_repetition();
 void push_to_last_eight_moves(Move move);
-Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_row);
+Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_row, PromotionOption promotion_option);
 
 /* Macros */
 #define IS_SQUARE_NULL(s) ((s).row == -1)
@@ -196,6 +213,7 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 #define ARROW_START_ROW (u8)28
 #define ARROW_START_COL (u8)102
 #define DIRECTION_OPTIONS (u8)4
+#define PROMOTION_OPTIONS (u8)4
 #define BOARD_SIZE (u8)8
 #define EMPTY_SQUARE (u8)0
 #define WHITE_PAWN (u8)1
