@@ -97,6 +97,8 @@ static void Close_Movement_Direction_Menu(void);
 static void Set_Promotion_Square(void);
 static void Selecting_Square(void);
 static void ChessAppSM_Error(void);
+static void Process_Valid_Move(void);
+static void Setup_Post_Move_Analysis(void);
 
 /* chess_utils.c */
 void print_str (u8 str[]);
@@ -126,6 +128,14 @@ void draw_game_interface();
 void set_check_indicator();
 
 /* chess_game.c */
+void set_move_to_make_part_two(Move move);
+Move get_move_to_make_part_two();
+void set_king_loses_short_castle_privileges(bool new_status);
+bool get_king_loses_short_castle_privileges();
+void set_king_loses_long_castle_privileges(bool new_status);
+bool get_king_loses_long_castle_privileges();
+void set_pawn_loses_special_move_privilege(bool new_status);
+bool get_pawn_loses_special_move_privilege();
 uint8_t* get_promotion_option(PromotionOption promotion_option, Colour turn);
 PromotionOption get_promotion();
 void set_promotion(PromotionOption new_promotion);
@@ -179,7 +189,7 @@ void change_turn();
 bool is_path_clear(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2);
 bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2);
 bool is_valid_move();
-void reset_special_move_attempt_flags();
+void reset_movement_validation_flags();
 void move_start_to_end();
 void undo_move_start_to_end();
 void reset_game_data();
@@ -194,6 +204,7 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 
 /* Macros */
 #define IS_SQUARE_NULL(s) ((s).row == -1)
+#define IS_MOVE_NULL(m) (IS_SQUARE_NULL((m).start) && IS_SQUARE_NULL((m).end))
 #define ARE_SQUARES_EQUAL(s1, s2) ((s1).row == (s2).row && (s1).col == (s2).col)
 
 /* Constants / Definitions */
@@ -251,6 +262,12 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 #define BLACK_PAWN_START_RANK 1
 
 #define DIRECTION_SELECTION_BUTTON 2
+
+#define NULL_SQUARE (Square){.col = -1, .row = -1}
+#define NULL_MOVE (Move){.start = NULL_SQUARE, .end = NULL_SQUARE, .promotion_selection = NO_PROMOTION}
+#define NO_MOVE 0
+#define PART_ONE 1
+#define PART_TWO 2
 
 /* Bitmaps */
 /*** Selected Square ***/
