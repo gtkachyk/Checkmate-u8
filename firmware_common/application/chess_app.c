@@ -1,38 +1,53 @@
 #include "chess_app.h"
 
-/* Variables */
+// System
 extern volatile u32 G_u32SystemTime1ms;
 extern volatile u32 G_u32SystemTime1s;
 extern volatile u32 G_u32SystemFlags;
 extern volatile u32 G_u32ApplicationFlags;
 volatile u32 G_u32ChessAppFlags;
 static fnCode_type ChessApp_pfStateMachine;
-static fnCode_type return_state;
-int ChessApp_au8Name[];
 extern u8 G_au8DebugScanBuffer[DEBUG_SCANF_BUFFER_SIZE];
 extern u8 G_u8DebugScanfCharCount;
+
+// State management
+static fnCode_type return_state;
 static int queue_timer = QUEUE_TIMER_MAX;
 static Queue state_queue;
+
+// Modes
+static bool controls_locked = FALSE;
+static bool analysis_mode = FALSE; // Analysis mode is when the program is checking if the current player has a valid move
+static bool debug = FALSE;
+
+// Testing
+static uint8_t debug_action = NO_DEBUG_ACTION;
+static uint8_t debug_inputs_index = 0;
+static uint8_t debug_moves_index = 0;
+uint8_t debug_inputs_size;
+uint8_t debug_moves_size;
+static Move* debug_moves;
+static uint8_t* debug_inputs; // Max inputs is 50 with current implementation
+static uint8_t debug_timer = DEBUG_TIMER_MAX;
+
+// Inter-state communication
+static uint8_t move_to_make_index = NO_MOVE;
 static uint8_t i = 0;
 static uint8_t j = 0;
 static uint8_t k = 0;
 static uint8_t l = 0;
 static uint8_t x = 0;
 static uint8_t y = 0;
-static bool controls_locked = FALSE;
-static bool analysis_mode = FALSE; // Analysis mode is when the program is checking if the current player has a valid move
-static bool debug = TRUE;
-static uint8_t debug_action = 5;
-static uint8_t debug_inputs_index = 0;
-static uint8_t debug_moves_index = 0;
-uint8_t debug_inputs_size;
-uint8_t debug_moves_size;
-static Move* debug_moves;
-static uint8_t debug_inputs[64]; // Max inputs is 50 with current implementation
-static uint8_t debug_timer = 500;
-static uint8_t move_to_make_index = NO_MOVE;
 
-/* Functions */
+/************************************************************************************************/
+/************************************************************************************************/
+/************************************** Helper Functions ****************************************/
+/************************************************************************************************/
+/************************************************************************************************/
+
+/************************************************************************************************/
+/***************************************** Test Setup *******************************************/
+/************************************************************************************************/
 void create_game_1_moves() {
     debug_moves[0] = create_move(E, TWO, E, FOUR, NO_PROMOTION);
     debug_moves[1] = create_move(E, SEVEN, E, FIVE, NO_PROMOTION);
@@ -145,19 +160,41 @@ void create_game_1_moves() {
 
 void create_test_moves() {
     debug_moves[0] = create_move(E, TWO, E, FOUR, NO_PROMOTION);
-    debug_moves[1] = create_move(A, SEVEN, A, FIVE, NO_PROMOTION);
+    debug_moves[1] = create_move(E, SEVEN, E, FIVE, NO_PROMOTION);
 
-    debug_moves[2] = create_move(E, FOUR, E, FIVE, NO_PROMOTION);
-    debug_moves[3] = create_move(D, SEVEN, D, FIVE, NO_PROMOTION);
+    debug_moves[2] = create_move(D, ONE, H, FIVE, NO_PROMOTION); // White queen advances
+    debug_moves[3] = create_move(B, EIGHT, C, SIX, NO_PROMOTION);
 
-    debug_moves[4] = create_move(E, FIVE, D, SIX, NO_PROMOTION);
-    debug_moves[5] = create_move(D, EIGHT, D, SIX, NO_PROMOTION);
+    debug_moves[4] = create_move(H, FIVE, F, SEVEN, NO_PROMOTION); // Queen forks King and Rook
+    debug_moves[5] = create_move(E, EIGHT, F, SEVEN, NO_PROMOTION);
+
+    debug_moves[6] = create_move(D, TWO, D, THREE, NO_PROMOTION);
+    debug_moves[7] = create_move(F, SEVEN, G, SIX, NO_PROMOTION);
+
+    debug_moves[8] = create_move(D, THREE, D, FOUR, NO_PROMOTION);
+    debug_moves[9] = create_move(G, SIX, H, FIVE, NO_PROMOTION);
+
+    debug_moves[10] = create_move(D, FOUR, D, FIVE, NO_PROMOTION);
+    debug_moves[11] = create_move(H, FIVE, H, SIX, NO_PROMOTION);
+
+    debug_moves[12] = create_move(D, FIVE, D, SIX, NO_PROMOTION);
+    debug_moves[13] = create_move(H, SIX, H, SEVEN, NO_PROMOTION);
+
+    debug_moves[14] = create_move(D, SIX, D, SEVEN, NO_PROMOTION);
+    debug_moves[15] = create_move(H, SEVEN, H, EIGHT, NO_PROMOTION);
 }
 
 void create_debug_moves() {
-    debug_moves_size = 6;
+    debug_moves_size = 16;
     debug_moves = (Move*)malloc(debug_moves_size * sizeof(Move));
     if (debug_moves == NULL) {
+        draw_error_message();
+        ChessApp_pfStateMachine = ChessAppSM_Error;
+        return;
+    }
+    debug_inputs = (uint8_t*)malloc(64);
+    if (debug_inputs == NULL) {
+        draw_error_message();
         ChessApp_pfStateMachine = ChessAppSM_Error;
         return;
     }
@@ -241,61 +278,6 @@ void generate_button_input(Move move, uint8_t index) {
     debug_inputs_size = index;
 }
 
-Node* create_node(fnCode_type new_data) {
-    Node* new_node = (Node*)malloc(sizeof(Node));
-    new_node->data = new_data;
-    new_node->next = NULL;
-    return new_node;
-}
-
-Queue* create_queue() {
-    Queue* q = (Queue*)malloc(sizeof(Queue));
-    q->front = q->rear = NULL;
-    return q;
-}
-
-bool is_empty(Queue* q) {
-    if (q->front == NULL && q->rear == NULL) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
-void enqueue(Queue* q, fnCode_type new_data) {
-    Node* new_node = create_node(new_data);
-    if (q->rear == NULL) {
-        q->front = q->rear = new_node;
-        return;
-    }
-    q->rear->next = new_node;
-    q->rear = new_node;
-}
-
-void dequeue(Queue* q) {
-    if (is_empty(q)) {
-        return;
-    }
-    Node* temp = q->front;
-    q->front = q->front->next;
-    if (q->front == NULL)
-        q->rear = NULL;
-    free(temp);
-}
-
-fnCode_type get_front(Queue* q) {
-    if (is_empty(q)) {
-        return NULL;
-    }
-    return q->front->data;
-}
-
-fnCode_type get_rear(Queue* q) {
-    if (is_empty(q)) {
-        return NULL;
-    }
-    return q->rear->data;
-}
-
 void resign() {
     set_king_in_check(FALSE);
     set_check_indicator();
@@ -304,30 +286,9 @@ void resign() {
     ChessApp_pfStateMachine = Chess_Menu;
 }
 
-void reset_app_data() {
-    controls_locked = FALSE;
-    analysis_mode = FALSE;
-    queue_timer = QUEUE_TIMER_MAX;
-    return_state = NULL;
-    i = 0;
-    j = 0;
-    k = 0;
-    l = 0;
-    x = 0;
-    y = 0;
-
-    // Clear the state queue
-    while (get_front(&state_queue) != NULL) {
-        dequeue(&state_queue);
-    }
-}
-
-void setup_new_game() {
-    reset_app_data();
-    reset_game_data();
-    draw_game_interface();
-}
-
+/************************************************************************************************/
+/*************************************** Miscellaneous ******************************************/
+/************************************************************************************************/
 void queue_post_move_analysis() {
     analysis_mode = TRUE;
     enqueue(&state_queue, &Post_Move_Check_Is_Draw_By_Repetition); // Check if the 2nd and 1st most recent moves are identical to the 4th and 3rd most recent moves
@@ -352,32 +313,106 @@ void queue_move_to_make() {
     enqueue(&state_queue, &Place_Piece);
 }
 
-void ChessAppInitialize(void) {
-  if (1) {
-    if (debug) {
-        reset_game_data();
-        create_debug_moves();
-        debug_inputs[0] = BUTTON1;
-        generate_button_input(debug_moves[debug_moves_index], 1);
-        debug_moves_index++;
+void set_next_debug_action() {
+    // If there are no more debug inputs
+    if (debug_inputs_index > debug_inputs_size - 1) {
+        if (debug_moves_index > debug_moves_size - 1) {
+            // If there are no more debug moves, end debugging session
+            debug = FALSE;
+            free(debug_moves);
+            return;
+        }
+        else {
+            // If there are more debug moves, populate debug_inputs with input to execute the next move
+            generate_button_input(debug_moves[debug_moves_index], 0);
+            debug_moves_index++;
+            debug_inputs_index = 0;
+        }
     }
-    draw_menu(get_previous_result(), get_turn());
-    state_queue = *(create_queue());
-    ChessApp_pfStateMachine = Chess_Menu;
-  }
-  else {
-    ChessApp_pfStateMachine = ChessAppSM_Error;
-  }
+    debug_action = debug_inputs[debug_inputs_index];
+    debug_inputs_index++;
+}
+
+void set_state_from_queue() {
+    ChessApp_pfStateMachine = get_front(&state_queue);
+    dequeue(&state_queue);
+    queue_timer = QUEUE_TIMER_MAX;
 }
 
 void ChessAppRunActiveState(void) {
-  ChessApp_pfStateMachine();
+    ChessApp_pfStateMachine();
 }
 
-// State Machine Function Definitions
+/************************************************************************************************/
+/***************************************** App Setup ********************************************/
+/************************************************************************************************/
+void reset_app_data() {
+    controls_locked = FALSE;
+    analysis_mode = FALSE;
+    queue_timer = QUEUE_TIMER_MAX;
+    return_state = NULL;
+    i = 0;
+    j = 0;
+    k = 0;
+    l = 0;
+    x = 0;
+    y = 0;
+
+    // Clear the state queue
+    while (get_front(&state_queue) != NULL) {
+        dequeue(&state_queue);
+    }
+}
+
+void setup_new_game() {
+    reset_app_data();
+    reset_game_data();
+    draw_game_interface();
+}
+
+void ChessAppInitialize(void) {
+    if (TRUE) {
+        if (debug) {
+            reset_game_data();
+            create_debug_moves();
+            debug_inputs[0] = BUTTON1;
+            generate_button_input(debug_moves[debug_moves_index], 1);
+            debug_moves_index++;
+        }
+        draw_menu(get_previous_result(), get_turn());
+        state_queue = *(create_queue());
+        ChessApp_pfStateMachine = Chess_Menu;
+    }
+    else {
+        draw_error_message();
+        ChessApp_pfStateMachine = ChessAppSM_Error;
+    }
+}
+
+/************************************************************************************************/
+/************************************************************************************************/
+/*************************************** State Machines *****************************************/
+/************************************************************************************************/
+/************************************************************************************************/
+
+/************************************************************************************************/
+/************************************** Drawing Functions ***************************************/
+/************************************************************************************************/
+
+/******************************************** Menu **********************************************/
 static void Chess_Menu(void) {
     if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
+        set_puzzle_mode(FALSE);
+        setup_new_game();
+        enqueue(&state_queue, &Flash_Highlighted_Square);
+        enqueue(&state_queue, &Flash_Movement_Indicator);
+        return_state = Selecting_Direction;
+        ChessApp_pfStateMachine = Selecting_Direction;
+    }
+    else if (WasButtonPressed(BUTTON1)) {
+        ButtonAcknowledge(BUTTON1);
+        set_puzzle_mode(TRUE);
         setup_new_game();
         enqueue(&state_queue, &Flash_Highlighted_Square);
         enqueue(&state_queue, &Flash_Movement_Indicator);
@@ -386,6 +421,20 @@ static void Chess_Menu(void) {
     }
 }
 
+/*********************************** Moving Side Indicators *************************************/
+static void Update_Player_Symbols(void) {
+    draw_player_symbols(get_turn());
+    ChessApp_pfStateMachine = return_state;
+}
+
+static void Change_Movement_Direction(void) {
+    set_direction((get_direction() + 1) % DIRECTION_OPTIONS);
+    draw_movement_direction(get_direction());
+    ChessApp_pfStateMachine = return_state;
+    controls_locked = FALSE;
+}
+
+/*************************************** Piece Movement *****************************************/
 static void Set_Promotion_Square(void) {
     set_square_content(get_move_to_make().end.col, get_move_to_make().end.row, get_promotion_option(get_promotion(), get_turn()));
     draw_piece(get_square_content(get_move_to_make().end.col, get_move_to_make().end.row), get_move_to_make().end.row, get_move_to_make().end.col);
@@ -431,88 +480,7 @@ static void Place_Piece(void) { // Use inline function to reduce redundancy?
     ChessApp_pfStateMachine = return_state;
 }
 
-// All moves should end here
-static void Setup_Post_Move_Analysis(void) {
-    Colour player_colour = get_piece_colour(get_square_content(get_move_to_make().end.col, get_move_to_make().end.row));
-
-    // Update data
-    push_to_last_eight_moves(get_move_to_make());
-    if (get_pawn_loses_special_move_privilege()) {
-        player_colour == WHITE ? set_white_pawn_special_move_status(get_move_to_make().start.col, FALSE) : set_black_pawn_special_move_status(get_move_to_make().start.col, FALSE);
-    }
-    if (get_king_loses_short_castle_privileges()) {
-        player_colour == WHITE ? set_white_short_castle_privileges(FALSE) : set_black_short_castle_privileges(FALSE);
-    }
-    if (get_king_loses_long_castle_privileges()) {
-        player_colour == WHITE ? set_white_long_castle_privileges(FALSE) : set_black_long_castle_privileges(FALSE);
-    }
-    if (player_colour == WHITE && get_square_content(get_move_to_make().end.col, get_move_to_make().end.row) == WHITE_KING) { // King location
-        set_white_king_square((Square){.col = get_move_to_make().end.col, .row = get_move_to_make().end.row});
-    }
-    else if (player_colour == BLACK && get_square_content(get_move_to_make().end.col, get_move_to_make().end.row) == BLACK_KING) {
-        set_black_king_square((Square){.col = get_move_to_make().end.col, .row = get_move_to_make().end.row});
-    }
-    if (get_attempting_special_pawn_move()) { // En passant square
-        set_en_passantable_square((Square){.row = get_move_to_make().end.row, .col = get_move_to_make().end.col});
-    }
-    else {
-        set_en_passantable_square((Square){.row = -1, .col = -1});
-    }
-    set_has_valid_move(FALSE);
-    set_king_in_check(FALSE);
-    reset_movement_validation_flags();
-    move_to_make_index = NO_MOVE;
-    set_move_to_make(NULL_MOVE);
-    set_move_to_make_part_two(NULL_MOVE);
-    change_turn();
-
-    // Queue remaining ui changes
-    set_check_indicator();
-    enqueue(&state_queue, &Update_Player_Symbols);
-    enqueue(&state_queue, &Deselect_Selected_Square);
-
-    // Queue post move analysis
-    queue_post_move_analysis();
-    return_state = Selecting_Square;
-    ChessApp_pfStateMachine = return_state;
-}
-
-static void Process_Valid_Move(void) {
-    Colour player_colour = get_piece_colour(get_square_content(get_move_to_make().start.col, get_move_to_make().start.row));
-
-    // Queue the states to update the lcd and board with the first part of the move
-    move_to_make_index = PART_ONE;
-    queue_move_to_make();
-
-    // Queue the states to update the lcd and board with the second part of the move if needed
-    if (get_attempting_short_castle()) {
-        player_colour == WHITE ? set_move_to_make_part_two((Move){.start = (Square){.col = H, .row = ONE}, .end = (Square){.col = F, .row = ONE}}) : set_move_to_make_part_two((Move){.start = (Square){.col = H, .row = EIGHT}, .end = (Square){.col = F, .row = EIGHT}});
-        queue_move_to_make();
-        enqueue(&state_queue, &Setup_Post_Move_Analysis);
-    }
-    else if (get_attempting_long_castle()) {
-        player_colour == WHITE ? set_move_to_make_part_two((Move){.start = (Square){.col = A, .row = ONE}, .end = (Square){.col = D, .row = ONE}}) : set_move_to_make_part_two((Move){.start = (Square){.col = A, .row = EIGHT}, .end = (Square){.col = D, .row = EIGHT}});
-        queue_move_to_make();
-        enqueue(&state_queue, &Setup_Post_Move_Analysis);
-    }
-    else if (get_attempting_en_passant()) {
-        enqueue(&state_queue, &Remove_EnPassantable_Piece);
-        enqueue(&state_queue, &Setup_Post_Move_Analysis);
-    }
-    else if (get_attempting_promotion()) {
-        enqueue(&state_queue, &Set_Promotion_Square);
-    }
-    else {
-        enqueue(&state_queue, &Setup_Post_Move_Analysis);
-    }
-    ChessApp_pfStateMachine = return_state;
-}
-
-static void Update_Player_Symbols(void) {
-    draw_player_symbols(get_turn());
-    ChessApp_pfStateMachine = return_state;
-}
-
+/************************************* Flashing Indicators **************************************/
 static void Flash_Highlighted_Square(void) {
     highlight_square(get_highlighted_square(), get_square_content(get_highlighted_square().col, get_highlighted_square().row), ARE_SQUARES_EQUAL(get_selected_square(), get_highlighted_square()));
     enqueue(&state_queue, &Flash_Highlighted_Square);
@@ -527,7 +495,22 @@ static void Flash_Movement_Indicator(void) {
     ChessApp_pfStateMachine = return_state;
 }
 
+/*********************************** Moving Board Indicators ************************************/
 static void Move_Highlighted_Square_Part_1(void) {
+    // New workaround method of accessing the change direction menu, only used by real players
+    if (IsButtonHeld(BUTTON0, 200)) {
+        debug_action = NO_DEBUG_ACTION;
+        dequeue(&state_queue); // Remove Move_Highlighted_Square_Part_2 from queue
+
+        // Open direction selection menu
+        ChessApp_pfStateMachine = Selecting_Direction;
+        return_state = Selecting_Direction; // Update the return state so queued states do not switch back to this one
+        enqueue(&state_queue, &Flash_Movement_Indicator); // Queue direction indicator flashing
+        controls_locked = FALSE;
+        return;
+    }
+
+    // The main purpose of this state
     draw_square(get_highlighted_square(), get_square_content(get_highlighted_square().col, get_highlighted_square().row));
     ChessApp_pfStateMachine = return_state;
 }
@@ -551,6 +534,18 @@ static void Deselect_Selected_Square(void) {
     }
 }
 
+static void Change_Promotion_Option(void) {
+    set_promotion((get_promotion() + 1) % PROMOTION_OPTIONS);
+    set_square_content(get_highlighted_square().col, get_highlighted_square().row, get_promotion_option(get_promotion(), get_turn()));
+    draw_piece(get_square_content(get_highlighted_square().col, get_highlighted_square().row), get_highlighted_square().row, get_highlighted_square().col);
+    ChessApp_pfStateMachine = return_state;
+    controls_locked = FALSE;
+}
+
+/************************************************************************************************/
+/************************************** Move Invalidation ***************************************/
+/************************************************************************************************/
+// This state is entered after a move is invalidated
 static void Process_Invalid_Move(void) { // Untested
     if (!analysis_mode) {
         enqueue(&state_queue, &Deselect_Selected_Square);
@@ -559,6 +554,9 @@ static void Process_Invalid_Move(void) { // Untested
     ChessApp_pfStateMachine = return_state;
 }
 
+/************************************************************************************************/
+/**************************************** Move Validation ***************************************/
+/************************************************************************************************/
 // Validate that the move is physically possible
 static void Validate_Move_Piece_Movement(void) {
     if (piece_can_move(get_move_to_make().start.row, get_move_to_make().start.col, get_move_to_make().end.row, get_move_to_make().end.col)) {
@@ -632,6 +630,38 @@ static void Validate_Move_Castle_Through_Check(void) {
     ChessApp_pfStateMachine = Validate_Move_Self_Inflicted_Check;
 }
 
+// This state is entered after a move is validated
+static void Process_Valid_Move(void) {
+    Colour player_colour = get_piece_colour(get_square_content(get_move_to_make().start.col, get_move_to_make().start.row));
+
+    // Queue the states to update the lcd and board with the first part of the move
+    move_to_make_index = PART_ONE;
+    queue_move_to_make();
+
+    // Queue the states to update the lcd and board with the second part of the move if needed
+    if (get_attempting_short_castle()) {
+        player_colour == WHITE ? set_move_to_make_part_two((Move){.start = (Square){.col = H, .row = ONE}, .end = (Square){.col = F, .row = ONE}}) : set_move_to_make_part_two((Move){.start = (Square){.col = H, .row = EIGHT}, .end = (Square){.col = F, .row = EIGHT}});
+        queue_move_to_make();
+        enqueue(&state_queue, &Setup_Post_Move_Analysis);
+    }
+    else if (get_attempting_long_castle()) {
+        player_colour == WHITE ? set_move_to_make_part_two((Move){.start = (Square){.col = A, .row = ONE}, .end = (Square){.col = D, .row = ONE}}) : set_move_to_make_part_two((Move){.start = (Square){.col = A, .row = EIGHT}, .end = (Square){.col = D, .row = EIGHT}});
+        queue_move_to_make();
+        enqueue(&state_queue, &Setup_Post_Move_Analysis);
+    }
+    else if (get_attempting_en_passant()) {
+        enqueue(&state_queue, &Remove_EnPassantable_Piece);
+        enqueue(&state_queue, &Setup_Post_Move_Analysis);
+    }
+    else if (get_attempting_promotion()) {
+        enqueue(&state_queue, &Set_Promotion_Square);
+    }
+    else {
+        enqueue(&state_queue, &Setup_Post_Move_Analysis);
+    }
+    ChessApp_pfStateMachine = return_state;
+}
+
 // Validate that the player is not in check after the move
 static void Validate_Move_Self_Inflicted_Check(void) {
     while (i < BOARD_SIZE) {
@@ -680,6 +710,55 @@ static void Validate_Move_Self_Inflicted_Check(void) {
     }
     i = 0;
     j = 0;
+    ChessApp_pfStateMachine = return_state;
+}
+
+/************************************************************************************************/
+/************************************* Post Move Validation *************************************/
+/************************************************************************************************/
+// All moves should end here
+static void Setup_Post_Move_Analysis(void) {
+    Colour player_colour = get_piece_colour(get_square_content(get_move_to_make().end.col, get_move_to_make().end.row));
+
+    // Update data
+    push_to_last_eight_moves(get_move_to_make());
+    if (get_pawn_loses_special_move_privilege()) {
+        player_colour == WHITE ? set_white_pawn_special_move_status(get_move_to_make().start.col, FALSE) : set_black_pawn_special_move_status(get_move_to_make().start.col, FALSE);
+    }
+    if (get_king_loses_short_castle_privileges()) {
+        player_colour == WHITE ? set_white_short_castle_privileges(FALSE) : set_black_short_castle_privileges(FALSE);
+    }
+    if (get_king_loses_long_castle_privileges()) {
+        player_colour == WHITE ? set_white_long_castle_privileges(FALSE) : set_black_long_castle_privileges(FALSE);
+    }
+    if (player_colour == WHITE && get_square_content(get_move_to_make().end.col, get_move_to_make().end.row) == WHITE_KING) { // King location
+        set_white_king_square((Square){.col = get_move_to_make().end.col, .row = get_move_to_make().end.row});
+    }
+    else if (player_colour == BLACK && get_square_content(get_move_to_make().end.col, get_move_to_make().end.row) == BLACK_KING) {
+        set_black_king_square((Square){.col = get_move_to_make().end.col, .row = get_move_to_make().end.row});
+    }
+    if (get_attempting_special_pawn_move()) { // En passant square
+        set_en_passantable_square((Square){.row = get_move_to_make().end.row, .col = get_move_to_make().end.col});
+    }
+    else {
+        set_en_passantable_square((Square){.row = -1, .col = -1});
+    }
+    set_has_valid_move(FALSE);
+    set_king_in_check(FALSE);
+    reset_movement_validation_flags();
+    move_to_make_index = NO_MOVE;
+    set_move_to_make(NULL_MOVE);
+    set_move_to_make_part_two(NULL_MOVE);
+    change_turn();
+
+    // Queue remaining ui changes
+    set_check_indicator();
+    enqueue(&state_queue, &Update_Player_Symbols);
+    enqueue(&state_queue, &Deselect_Selected_Square);
+
+    // Queue post move analysis
+    queue_post_move_analysis();
+    return_state = Selecting_Square;
     ChessApp_pfStateMachine = return_state;
 }
 
@@ -769,6 +848,14 @@ static void Post_Move_Check_Has_Valid_Move(void) {
         }
         get_king_in_check() ? set_previous_result(RESULT_CHECKMATE) : set_previous_result(RESULT_DRAW);
         set_king_in_check(FALSE);
+        if (get_puzzle_mode()) {
+            if (get_current_puzzle() == 2) {
+                set_current_puzzle(0);
+            }
+            else {
+                set_current_puzzle(get_current_puzzle() + 1);
+            }
+        }
         draw_menu(get_previous_result(), !get_turn());
         ChessApp_pfStateMachine = Chess_Menu;
         return;
@@ -780,45 +867,36 @@ static void Post_Move_Check_Has_Valid_Move(void) {
     reset_movement_validation_flags();
     analysis_mode = FALSE;
     controls_locked = FALSE;
-    return_state = Selecting_Square;
+    if (get_puzzle_mode()) {
+        set_previous_result(RESULT_NONE);
+        set_king_in_check(FALSE);
+        draw_menu(get_previous_result(), !get_turn());
+        ChessApp_pfStateMachine = Chess_Menu;
+    }
+    else {
+        return_state = Selecting_Square;
+        ChessApp_pfStateMachine = return_state;
+    }
+}
+
+/************************************************************************************************/
+/************************************** Menu Helpers ********************************************/
+/************************************************************************************************/
+static void Close_Movement_Direction_Menu(void) {
+    draw_movement_direction(get_direction());
     ChessApp_pfStateMachine = return_state;
+    controls_locked = FALSE;
 }
 
 /************************************************************************************************/
 /****************************************** Menus ***********************************************/
 /************************************************************************************************/
-void set_next_debug_action() {
-    // If there are no more debug inputs
-    if (debug_inputs_index > debug_inputs_size - 1) {
-        if (debug_moves_index > debug_moves_size - 1) {
-            // If there are no more debug moves, end debugging session
-            debug = FALSE;
-            free(debug_moves);
-            return;
-        }
-        else {
-            // If there are more debug moves, populate debug_inputs with input to execute the next move
-            generate_button_input(debug_moves[debug_moves_index], 0);
-            debug_moves_index++;
-            debug_inputs_index = 0;
-        }
-    }
-    debug_action = debug_inputs[debug_inputs_index];
-    debug_inputs_index++;
-}
-
-void set_state_from_queue() {
-    ChessApp_pfStateMachine = get_front(&state_queue);
-    dequeue(&state_queue);
-    queue_timer = QUEUE_TIMER_MAX;
-}
-
 static void Selecting_Square(void) {
     if (debug && !controls_locked) {
         debug_timer--;
         if (debug_timer == 0) {
             set_next_debug_action();
-            debug_timer = 500;
+            debug_timer = DEBUG_TIMER_MAX;
         }
     }
 
@@ -830,18 +908,18 @@ static void Selecting_Square(void) {
     if (controls_locked) return;
 
     // Process button intput
-    if (WasButtonPressed(BUTTON0) || (debug && debug_action == 0)) {
+    if (WasButtonPressed(BUTTON0) || (debug && debug_action == BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
-        debug_action = 5;
+        debug_action = NO_DEBUG_ACTION;
 
         // Move highlighted square in the selected direction
         controls_locked = TRUE;
         enqueue(&state_queue, &Move_Highlighted_Square_Part_1);
         enqueue(&state_queue, &Move_Highlighted_Square_Part_2);      
     }
-    else if (WasButtonPressed(BUTTON1) || (debug && debug_action == 1)) {
+    else if (WasButtonPressed(BUTTON1) || (debug && debug_action == BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
-        debug_action = 5;
+        debug_action = NO_DEBUG_ACTION;
 
         // Select highlighted piece
         if (IS_SQUARE_NULL(get_selected_square())) {
@@ -854,8 +932,8 @@ static void Selecting_Square(void) {
             ChessApp_pfStateMachine = Validate_Move_Piece_Movement;
         }
     }
-    else if (IsButtonHeld(BUTTON0, 500) || (debug && debug_action == 2)) {
-        debug_action = 5;
+    else if (debug && debug_action == DIRECTION_SELECTION_BUTTON) { // Old method of accessing the change direction menu, still used by the debugger
+        debug_action = NO_DEBUG_ACTION;
 
         // Open direction selection menu
         ChessApp_pfStateMachine = Selecting_Direction;
@@ -864,25 +942,12 @@ static void Selecting_Square(void) {
     }
 }
 
-static void Change_Movement_Direction(void) {
-    set_direction((get_direction() + 1) % DIRECTION_OPTIONS);
-    draw_movement_direction(get_direction());
-    ChessApp_pfStateMachine = return_state;
-    controls_locked = FALSE;
-}
-
-static void Close_Movement_Direction_Menu(void) {
-    draw_movement_direction(get_direction());
-    ChessApp_pfStateMachine = return_state;
-    controls_locked = FALSE;
-}
-
 static void Selecting_Direction(void) {
     if (debug && !controls_locked) {
         debug_timer--;
         if (debug_timer == 0) {
             set_next_debug_action();
-            if (debug_action != DIRECTION_SELECTION_BUTTON) debug_timer = 500;
+            if (debug_action != DIRECTION_SELECTION_BUTTON) debug_timer = DEBUG_TIMER_MAX;
         }
     }
 
@@ -894,35 +959,27 @@ static void Selecting_Direction(void) {
     if (controls_locked) return;
 
     // Process button intput
-    if (WasButtonPressed(BUTTON0) || (debug && debug_action == 0)) {
+    if (WasButtonPressed(BUTTON0) || (debug && debug_action == BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
-        debug_action = 5;
+        debug_action = NO_DEBUG_ACTION;
 
         // Select next direction option
         controls_locked = TRUE;
         enqueue(&state_queue, &Change_Movement_Direction);
     }
-    else if (WasButtonPressed(BUTTON1) || (debug && debug_action == 1)) {
+    else if (WasButtonPressed(BUTTON1) || (debug && debug_action == BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
-        debug_action = 5;
+        debug_action = NO_DEBUG_ACTION;
 
         // Close direction selection menu
         controls_locked = TRUE;
         return_state = Selecting_Square; // Update the return state so queued states do not switch back to this one
         enqueue(&state_queue, &Close_Movement_Direction_Menu); // Queue state to redraw the direction indicator incase it is invisible
     }
-    else if (IsButtonHeld(BUTTON0, 2000)) {
+    else if (IsButtonHeld(BUTTON0, 5000)) {
         // Resign game
         resign();
     }
-}
-
-static void Change_Promotion_Option(void) {
-    set_promotion((get_promotion() + 1) % PROMOTION_OPTIONS);
-    set_square_content(get_highlighted_square().col, get_highlighted_square().row, get_promotion_option(get_promotion(), get_turn()));
-    draw_piece(get_square_content(get_highlighted_square().col, get_highlighted_square().row), get_highlighted_square().row, get_highlighted_square().col);
-    ChessApp_pfStateMachine = return_state;
-    controls_locked = FALSE;
 }
 
 static void Selecting_Promotion(void) {
@@ -930,7 +987,7 @@ static void Selecting_Promotion(void) {
         debug_timer--;
         if (debug_timer == 0) {
             set_next_debug_action();
-            if (debug_action != DIRECTION_SELECTION_BUTTON) debug_timer = 500;
+            if (debug_action != DIRECTION_SELECTION_BUTTON) debug_timer = DEBUG_TIMER_MAX;
         }
     }
 
@@ -942,17 +999,17 @@ static void Selecting_Promotion(void) {
     if (controls_locked) return;
 
     // Process button intput
-    if (WasButtonPressed(BUTTON0) || (debug && debug_action == 0)) {
+    if (WasButtonPressed(BUTTON0) || (debug && debug_action == BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
-        debug_action = 5;
+        debug_action = NO_DEBUG_ACTION;
 
         // Select next promotion option
         controls_locked = TRUE;
         enqueue(&state_queue, &Change_Promotion_Option);
     }
-    else if (WasButtonPressed(BUTTON1) || (debug && debug_action == 1)) {
+    else if (WasButtonPressed(BUTTON1) || (debug && debug_action == BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
-        debug_action = 5;
+        debug_action = NO_DEBUG_ACTION;
 
         // Continue processing
         controls_locked = TRUE;
@@ -961,5 +1018,5 @@ static void Selecting_Promotion(void) {
 }
 
 static void ChessAppSM_Error(void) {
-  
+    // Do nothing
 }

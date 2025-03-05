@@ -107,6 +107,12 @@ void print_int_var (u8 name[], u32 val);
 void print_square(u8 name[], Square square);
 void print_state();
 void print_move(u8 name[], Move move);
+Node* create_node(fnCode_type new_data);
+Queue* create_queue();
+bool is_empty(Queue* q);
+void enqueue(Queue* q, fnCode_type new_data);
+void dequeue(Queue* q);
+fnCode_type get_front(Queue* q);
 
 /* chess_lcd.c */
 void flash_arrow(MovementDirection direction);
@@ -126,8 +132,13 @@ void draw_pieces();
 void draw_board();
 void draw_game_interface();
 void set_check_indicator();
+void draw_error_message();
 
 /* chess_game.c */
+void set_current_puzzle(uint8_t puzzle);
+uint8_t get_current_puzzle();
+void set_puzzle_mode(bool state);
+bool get_puzzle_mode();
 void set_move_to_make_part_two(Move move);
 Move get_move_to_make_part_two();
 void set_king_loses_short_castle_privileges(bool new_status);
@@ -268,6 +279,8 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 #define NO_MOVE 0
 #define PART_ONE 1
 #define PART_TWO 2
+#define NO_DEBUG_ACTION 5
+#define DEBUG_TIMER_MAX 500
 
 /* Bitmaps */
 /*** Selected Square ***/

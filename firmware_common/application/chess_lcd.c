@@ -80,6 +80,12 @@ void draw_board() {
     draw_pieces();
 }
 
+void draw_error_message() {
+    LcdClearScreen();
+    PixelAddressType sTargetPixel = {25, 52};
+    LcdLoadString("ERROR", LCD_FONT_SMALL, &sTargetPixel);
+}
+
 void draw_menu(GameResult previous_result, Colour turn) {
     LcdClearScreen();
     PixelAddressType sTargetPixel = {5, 52};
@@ -89,7 +95,13 @@ void draw_menu(GameResult previous_result, Colour turn) {
     sTargetPixel.u16PixelColumnAddress = 10;
     LcdLoadString("Button 0 - New Game", LCD_FONT_SMALL, &sTargetPixel);
 
-    sTargetPixel.u16PixelRowAddress = 35;
+    sTargetPixel.u16PixelRowAddress = 28;
+    sTargetPixel.u16PixelColumnAddress = 10;
+    unsigned char puzzle_str[20];
+    sprintf(puzzle_str, "Button 1 - Puzzle %d", get_current_puzzle() + 1);
+    LcdLoadString(puzzle_str, LCD_FONT_SMALL, &sTargetPixel);
+
+    sTargetPixel.u16PixelRowAddress = 40;
     sTargetPixel.u16PixelColumnAddress = 25;
     if (previous_result == RESULT_CHECKMATE) {
         if (turn == BLACK) {
@@ -98,7 +110,7 @@ void draw_menu(GameResult previous_result, Colour turn) {
         else {
             LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
         }
-        sTargetPixel.u16PixelRowAddress = 45;
+        sTargetPixel.u16PixelRowAddress = 50;
         sTargetPixel.u16PixelColumnAddress = 35;
         LcdLoadString("checkmate!", LCD_FONT_SMALL, &sTargetPixel);
     }
@@ -109,7 +121,7 @@ void draw_menu(GameResult previous_result, Colour turn) {
         else {
             LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
         }
-        sTargetPixel.u16PixelRowAddress = 45;
+        sTargetPixel.u16PixelRowAddress = 50;
         sTargetPixel.u16PixelColumnAddress = 30;
         LcdLoadString("resignation!", LCD_FONT_SMALL, &sTargetPixel);
     }

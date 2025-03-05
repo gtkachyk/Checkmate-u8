@@ -29,6 +29,8 @@ static bool debug = FALSE;
 // };
 
 // Game state
+static bool puzzle_mode = FALSE;
+static uint8_t current_puzzle = 0;
 static GameResult previous_result = RESULT_NONE;
 static Colour turn = WHITE;
 static Square en_passantable_square = {-1, -1};
@@ -77,6 +79,22 @@ static bool king_loses_long_castle_privileges = FALSE;
 static uint8_t piece_cache;
 static Move move_to_make;
 static Move move_to_make_part_two;
+
+void set_current_puzzle(uint8_t puzzle) {
+    current_puzzle = puzzle;
+}
+
+uint8_t get_current_puzzle() {
+    return current_puzzle;
+}
+
+void set_puzzle_mode(bool state) {
+    puzzle_mode = state;
+}
+
+bool get_puzzle_mode() {
+    return puzzle_mode;
+}
 
 void set_move_to_make_part_two(Move move) {
     move_to_make_part_two = move;
@@ -373,31 +391,89 @@ void change_turn() {
     }
 }
 
+void set_rank (uint8_t rank, uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t h) {
+    board[rank][0] = a;
+    board[rank][1] = b;
+    board[rank][2] = c;
+    board[rank][3] = d;
+    board[rank][4] = e;
+    board[rank][5] = f;
+    board[rank][6] = g;
+    board[rank][7] = h;
+}
+
+void load_puzzle_0() {
+    set_rank(EIGHT, BLACK_ROOK,     EMPTY_SQUARE,   BLACK_BISHOP,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_BISHOP,   EMPTY_SQUARE,   BLACK_ROOK);
+    set_rank(SEVEN, BLACK_PAWN,     BLACK_PAWN,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   WHITE_QUEEN,    BLACK_PAWN,     EMPTY_SQUARE);
+    set_rank(SIX,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_KNIGHT,   BLACK_KING,     BLACK_KNIGHT,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_PAWN);
+    set_rank(FIVE,  EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_PAWN,     BLACK_PAWN,     WHITE_PAWN,     EMPTY_SQUARE,   BLACK_PAWN);
+    set_rank(FOUR,  WHITE_PAWN,     EMPTY_SQUARE,   BLACK_PAWN,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(THREE, EMPTY_SQUARE,   WHITE_KNIGHT,   WHITE_PAWN,     EMPTY_SQUARE,   WHITE_KNIGHT,   WHITE_BISHOP,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(TWO,   EMPTY_SQUARE,   WHITE_PAWN,     WHITE_PAWN,     EMPTY_SQUARE,   WHITE_PAWN,     WHITE_PAWN,     WHITE_ROOK,     EMPTY_SQUARE);
+    set_rank(ONE,   EMPTY_SQUARE,   WHITE_KING,     EMPTY_SQUARE,   WHITE_ROOK,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_QUEEN);
+    white_pawns_special_move_status = 0x6C;
+    black_pawns_special_move_status = 0xC2;
+    white_has_short_castle_privileges = FALSE;
+    black_has_short_castle_privileges = FALSE;
+    white_has_long_castle_privileges = FALSE;
+    black_has_long_castle_privileges = FALSE;
+    en_passantable_square = NULL_SQUARE;
+    white_king_square = (Square){.col = B, .row = ONE};
+    black_king_square = (Square){.col = D, .row = SIX};
+    turn = WHITE;
+}
+
+void load_puzzle_1() {
+    set_rank(EIGHT, EMPTY_SQUARE,   EMPTY_SQUARE,   WHITE_KING,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(SEVEN, WHITE_QUEEN,    EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(SIX,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(FIVE,  EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(FOUR,  EMPTY_SQUARE,   WHITE_KNIGHT,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(THREE, EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(TWO,   BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN);
+    set_rank(ONE,   BLACK_ROOK,     BLACK_KNIGHT,   BLACK_BISHOP,   BLACK_QUEEN,    BLACK_KING,     BLACK_BISHOP,   BLACK_KNIGHT,   BLACK_ROOK);
+    white_pawns_special_move_status = 0x00;
+    black_pawns_special_move_status = 0x00;
+    white_has_short_castle_privileges = FALSE;
+    black_has_short_castle_privileges = FALSE;
+    white_has_long_castle_privileges = FALSE;
+    black_has_long_castle_privileges = FALSE;
+    en_passantable_square = NULL_SQUARE;
+    white_king_square = (Square){.col = C, .row = EIGHT};
+    black_king_square = (Square){.col = E, .row = ONE};
+    turn = WHITE;
+}
+
+void load_puzzle_2() {
+    set_rank(EIGHT, EMPTY_SQUARE,   BLACK_KING,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(SEVEN, EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_PAWN,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_PAWN,     EMPTY_SQUARE);
+    set_rank(SIX,   EMPTY_SQUARE,   BLACK_PAWN,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   WHITE_PAWN,     EMPTY_SQUARE);
+    set_rank(FIVE,  EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(FOUR,  EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   WHITE_KING);
+    set_rank(THREE, EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_BISHOP,   BLACK_QUEEN,    EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(TWO,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_PAWN,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(ONE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    white_pawns_special_move_status = 0x00;
+    black_pawns_special_move_status = 0x22;
+    white_has_short_castle_privileges = FALSE;
+    black_has_short_castle_privileges = FALSE;
+    white_has_long_castle_privileges = FALSE;
+    black_has_long_castle_privileges = FALSE;
+    en_passantable_square = NULL_SQUARE;
+    white_king_square = (Square){.col = H, .row = FOUR};
+    black_king_square = (Square){.col = B, .row = EIGHT};
+    turn = BLACK;
+}
+
 void reset_board() {
-    board[0][0] = 10;
-    board[0][1] = 8;
-    board[0][2] = 9;
-    board[0][3] = 11;
-    board[0][4] = 12;
-    board[0][5] = 9;
-    board[0][6] = 8;
-    board[0][7] = 10;
-    for (int i = 0; i < 8; i++) {
-        board[1][i] = 7;
-        board[2][i] = 0;
-        board[3][i] = 0;
-        board[4][i] = 0;
-        board[5][i] = 0;
-        board[6][i] = 1;
-    }
-    board[7][0] = 4;
-    board[7][1] = 2;
-    board[7][2] = 3;
-    board[7][3] = 5;
-    board[7][4] = 6;
-    board[7][5] = 3;
-    board[7][6] = 2;
-    board[7][7] = 4;
+    set_rank(EIGHT, BLACK_ROOK,     BLACK_KNIGHT,   BLACK_BISHOP,   BLACK_QUEEN,    BLACK_KING,     BLACK_BISHOP,   BLACK_KNIGHT,   BLACK_ROOK);
+    set_rank(SEVEN, BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN);
+    set_rank(SIX,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(FIVE,  EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(FOUR,  EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(THREE, EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
+    set_rank(TWO,   WHITE_PAWN,     WHITE_PAWN,     WHITE_PAWN,     WHITE_PAWN,     WHITE_PAWN,     WHITE_PAWN,     WHITE_PAWN,     WHITE_PAWN);
+    set_rank(ONE,   WHITE_ROOK,     WHITE_KNIGHT,   WHITE_BISHOP,   WHITE_QUEEN,    WHITE_KING,     WHITE_BISHOP,   WHITE_KNIGHT,   WHITE_ROOK);
 }
 
 void set_movement_validation_flags(bool special_pawn_move, bool special_move_privilege, bool promotion, bool en_passant, bool short_castle, bool long_castle, bool loses_short_castle, bool loses_long_castle) {
@@ -707,7 +783,6 @@ bool draw_by_repetition() {
 void reset_game_data() {
     if (!debug) {
         previous_result = RESULT_NONE;
-        reset_board();
         turn = WHITE;
         white_pawns_special_move_status = 0xFF;
         black_pawns_special_move_status = 0xFF;
@@ -729,6 +804,21 @@ void reset_game_data() {
         highlighted_square = (Square){.row = 7, .col = 0};
         selected_square = (Square){.row = -1, .col = -1};
         initialize_last_eight_moves();
+
+        if (puzzle_mode) {
+            if (current_puzzle == 0) {
+                load_puzzle_0();
+            }
+            else if (current_puzzle == 1) {
+                load_puzzle_1();
+            }
+            else if (current_puzzle == 2) {
+                load_puzzle_2();
+            }
+        }
+        else {
+            reset_board();
+        }
     }
     else {
         previous_result = RESULT_NONE;
