@@ -162,10 +162,10 @@ void create_test_moves() {
     debug_moves[0] = create_move(E, TWO, E, FOUR, NO_PROMOTION);
     debug_moves[1] = create_move(E, SEVEN, E, FIVE, NO_PROMOTION);
 
-    debug_moves[2] = create_move(D, ONE, H, FIVE, NO_PROMOTION); // White queen advances
+    debug_moves[2] = create_move(D, ONE, H, FIVE, NO_PROMOTION);
     debug_moves[3] = create_move(B, EIGHT, C, SIX, NO_PROMOTION);
 
-    debug_moves[4] = create_move(H, FIVE, F, SEVEN, NO_PROMOTION); // Queen forks King and Rook
+    debug_moves[4] = create_move(H, FIVE, F, SEVEN, NO_PROMOTION);
     debug_moves[5] = create_move(E, EIGHT, F, SEVEN, NO_PROMOTION);
 
     debug_moves[6] = create_move(D, TWO, D, THREE, NO_PROMOTION);
@@ -868,7 +868,7 @@ static void Post_Move_Check_Has_Valid_Move(void) {
     analysis_mode = FALSE;
     controls_locked = FALSE;
     if (get_puzzle_mode()) {
-        set_previous_result(RESULT_NONE);
+        set_previous_result(RESULT_PUZZLE_FAILED);
         set_king_in_check(FALSE);
         draw_menu(get_previous_result(), !get_turn());
         ChessApp_pfStateMachine = Chess_Menu;

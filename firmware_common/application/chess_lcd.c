@@ -129,6 +129,11 @@ void draw_menu(GameResult previous_result, Colour turn) {
         sTargetPixel.u16PixelColumnAddress = 52;
         LcdLoadString("Draw", LCD_FONT_SMALL, &sTargetPixel);
     }
+    else if (previous_result == RESULT_PUZZLE_FAILED) {
+        sTargetPixel.u16PixelRowAddress = 45;
+        sTargetPixel.u16PixelColumnAddress = 20;
+        LcdLoadString("Puzzle failed :(", LCD_FONT_SMALL, &sTargetPixel);
+    }
     set_check_indicator();
 }
 

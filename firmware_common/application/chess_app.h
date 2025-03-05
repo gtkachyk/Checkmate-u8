@@ -11,7 +11,8 @@ typedef enum {
     RESULT_NONE = 0,
     RESULT_CHECKMATE = 1,
     RESULT_RESIGNATION = 2,
-    RESULT_DRAW = 3
+    RESULT_DRAW = 3,
+    RESULT_PUZZLE_FAILED = 4
 } GameResult;
 
 typedef enum {
