@@ -7,25 +7,14 @@ const uint8_t PROMOTIONS[4][2] = {{BLACK_KNIGHT, WHITE_KNIGHT}, {BLACK_BISHOP, W
 // Testing data
 static bool debug = FALSE;
 // static u8 board[8][8] = {
-//     {0, 12, 0, 2, 0, 0, 0, 0}, 
-//     {7, 0, 7, 0, 0, 10, 0, 0}, 
-//     {0, 7, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 7}, 
+//     {10, 8, 9, 0, 12, 9, 8, 10}, 
+//     {7, 7, 7, 7, 0, 0, 7, 7}, 
+//     {0, 0, 0, 0, 1, 11, 0, 0}, 
+//     {0, 0, 0, 0, 0, 1, 0, 0}, 
 //     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 7}, 
-//     {1, 1, 0, 0, 5, 11, 0, 6}, 
-//     {0, 0, 0, 4, 4, 0, 11, 0}
-// };
-
-// static u8 board[8][8] = {
-//     {0, 0, 0, 0, 12, 0, 0, 0},
-//     {0, 0, 0, 0, 0, 0, 0, 0},
-//     {0, 0, 0, 0, 0, 0, 0, 0},
-//     {0, 0, 0, 0, 0, 0, 0, 0},
-//     {0, 0, 0, 0, 0, 0, 0, 0}, 
-//     {0, 0, 0, 0, 0, 0, 0, 0},
-//     {0, 0, 0, 0, 0, 0, 0, 0},
-//     {0, 0, 0, 0, 6, 0, 0, 4},
+//     {0, 0, 0, 0, 0, 0, 0, 2}, 
+//     {1, 1, 1, 1, 1, 0, 3, 1}, 
+//     {4, 2, 3, 5, 0, 6, 0, 4}
 // };
 
 // Game state
@@ -33,12 +22,13 @@ static bool puzzle_mode = FALSE;
 static uint8_t current_puzzle = 0;
 static GameResult previous_result = RESULT_NONE;
 static Colour turn = WHITE;
-static Square en_passantable_square = {-1, -1};
+static Square en_passantable_square = NULL_SQUARE;
 static Square white_king_square = {ONE, E}; // Tracks the location of the white king
 static Square black_king_square = {EIGHT, E}; // Tracks the location of the black king
 static bool king_in_check = FALSE; // Tracks if the moving player's king is in check
 static bool has_valid_move = FALSE;
 static Move last_eight_moves[8];
+static int8_t fifty_move_rule_counter = 0;
 static u8 board[8][8] = {
     {10, 8, 9, 11, 12, 9, 8, 10}, 
     {7, 7, 7, 7, 7, 7, 7, 7}, 
@@ -57,8 +47,8 @@ static Square highlighted_square = {7, 0};
 static Square selected_square = {-1, -1};
 
 // Piece statuses
-static uint8_t white_pawns_special_move_status = 0xFF;
-static uint8_t black_pawns_special_move_status = 0xFF;
+static uint8_t white_pawns_special_move_privileges = 0xFF; // Doesn't work when a pawn moves into another col
+static uint8_t black_pawns_special_move_privileges = 0xFF;
 static bool white_has_short_castle_privileges = TRUE;
 static bool black_has_short_castle_privileges = TRUE;
 static bool white_has_long_castle_privileges = TRUE;
@@ -79,6 +69,23 @@ static bool king_loses_long_castle_privileges = FALSE;
 static uint8_t piece_cache;
 static Move move_to_make;
 static Move move_to_make_part_two;
+static bool preserve_validation_flags = FALSE;
+
+void set_fifty_move_rule_counter(int8_t new_val) {
+    fifty_move_rule_counter = new_val;
+}
+
+int8_t get_fifty_move_rule_counter() {
+    return fifty_move_rule_counter;
+}
+
+void set_preserve_validation_flags(bool state) {
+    preserve_validation_flags = state;
+}
+
+bool get_preserve_validation_flags() {
+    return preserve_validation_flags;
+}
 
 void set_current_puzzle(uint8_t puzzle) {
     current_puzzle = puzzle;
@@ -255,20 +262,24 @@ bool get_attempting_en_passant() {
     return attempting_en_passant;
 }
 
-void set_white_pawn_special_move_status(uint8_t file, bool new_status) {
-    white_pawns_special_move_status = white_pawns_special_move_status ^ (1 << file);
+void remove_white_pawn_special_move_privileges(uint8_t file) {
+    if (get_white_pawn_special_move_privileges(file)) {
+        white_pawns_special_move_privileges = white_pawns_special_move_privileges ^ (1 << file);
+    }
 }
 
-bool get_white_pawn_special_move_status(uint8_t file) {
-    return (white_pawns_special_move_status >> file) & 1;
+bool get_white_pawn_special_move_privileges(uint8_t file) {
+    return (white_pawns_special_move_privileges >> file) & 1;
 }
 
-void set_black_pawn_special_move_status(uint8_t file, bool new_status) {
-    black_pawns_special_move_status = black_pawns_special_move_status ^ (1 << file);
+void remove_black_pawn_special_move_privileges(uint8_t file) {
+    if (get_black_pawn_special_move_privileges(file)) {
+        black_pawns_special_move_privileges = black_pawns_special_move_privileges ^ (1 << file);
+    }
 }
 
-bool get_black_pawn_special_move_status(uint8_t file) {
-    return (black_pawns_special_move_status >> file) & 1;
+bool get_black_pawn_special_move_privileges(uint8_t file) {
+    return (black_pawns_special_move_privileges >> file) & 1;
 }
 
 Square get_en_passantable_square() {
@@ -361,13 +372,13 @@ void set_black_long_castle_privileges(bool new_privileges) {
 
 uint8_t get_piece_colour(uint8_t piece) {
     if (piece > 0 && piece < 7) {
-        return WHITE;
+        return (uint8_t)WHITE;
     }
     else if (piece > 6 && piece < 13) {
-        return BLACK;
+        return (uint8_t)BLACK;
     }
     else {
-        return -1;
+        return UNDEFINED_COLOUR;
     }
 }
 
@@ -411,8 +422,8 @@ void load_puzzle_0() {
     set_rank(THREE, EMPTY_SQUARE,   WHITE_KNIGHT,   WHITE_PAWN,     EMPTY_SQUARE,   WHITE_KNIGHT,   WHITE_BISHOP,   EMPTY_SQUARE,   EMPTY_SQUARE);
     set_rank(TWO,   EMPTY_SQUARE,   WHITE_PAWN,     WHITE_PAWN,     EMPTY_SQUARE,   WHITE_PAWN,     WHITE_PAWN,     WHITE_ROOK,     EMPTY_SQUARE);
     set_rank(ONE,   EMPTY_SQUARE,   WHITE_KING,     EMPTY_SQUARE,   WHITE_ROOK,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_QUEEN);
-    white_pawns_special_move_status = 0x6C;
-    black_pawns_special_move_status = 0xC2;
+    white_pawns_special_move_privileges = 0x6C;
+    black_pawns_special_move_privileges = 0xC2;
     white_has_short_castle_privileges = FALSE;
     black_has_short_castle_privileges = FALSE;
     white_has_long_castle_privileges = FALSE;
@@ -432,8 +443,8 @@ void load_puzzle_1() {
     set_rank(THREE, EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
     set_rank(TWO,   BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN,     BLACK_PAWN);
     set_rank(ONE,   BLACK_ROOK,     BLACK_KNIGHT,   BLACK_BISHOP,   BLACK_QUEEN,    BLACK_KING,     BLACK_BISHOP,   BLACK_KNIGHT,   BLACK_ROOK);
-    white_pawns_special_move_status = 0x00;
-    black_pawns_special_move_status = 0x00;
+    white_pawns_special_move_privileges = 0x00;
+    black_pawns_special_move_privileges = 0x00;
     white_has_short_castle_privileges = FALSE;
     black_has_short_castle_privileges = FALSE;
     white_has_long_castle_privileges = FALSE;
@@ -453,8 +464,8 @@ void load_puzzle_2() {
     set_rank(THREE, EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_BISHOP,   BLACK_QUEEN,    EMPTY_SQUARE,   EMPTY_SQUARE);
     set_rank(TWO,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   BLACK_PAWN,     EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
     set_rank(ONE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE,   EMPTY_SQUARE);
-    white_pawns_special_move_status = 0x00;
-    black_pawns_special_move_status = 0x22;
+    white_pawns_special_move_privileges = 0x00;
+    black_pawns_special_move_privileges = 0x22;
     white_has_short_castle_privileges = FALSE;
     black_has_short_castle_privileges = FALSE;
     white_has_long_castle_privileges = FALSE;
@@ -488,7 +499,13 @@ void set_movement_validation_flags(bool special_pawn_move, bool special_move_pri
 }
 
 bool squares_have_opposite_colour_pieces(Square square_1, Square square_2) {
-    return get_piece_colour(get_square_content(square_1.col, square_1.row)) == !get_piece_colour(get_square_content(square_2.col, square_2.row));
+    if ((get_piece_colour(get_square_content(square_1.col, square_1.row)) == UNDEFINED_COLOUR) || (get_piece_colour(get_square_content(square_2.col, square_2.row)) == UNDEFINED_COLOUR)) {
+        return FALSE;
+    }
+    if (get_piece_colour(get_square_content(square_1.col, square_1.row)) != get_piece_colour(get_square_content(square_2.col, square_2.row))) {
+        return TRUE;
+    }
+    return FALSE;
 }
 
 bool is_path_clear(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) {
@@ -520,73 +537,99 @@ bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) 
         int8_t pawn_direction = (piece == WHITE_PAWN) ? -1 : 1;
         if (row_2 == row_1 + pawn_direction && col_2 == col_1 && destination_square == EMPTY_SQUARE) {
             // Standard move
-            turn == WHITE ? set_movement_validation_flags(FALSE, row_1 == TWO, row_2 == EIGHT, FALSE, FALSE, FALSE, FALSE, FALSE) : set_movement_validation_flags(FALSE, row_1 == SEVEN, row_2 == ONE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            if (!preserve_validation_flags) {
+                turn == WHITE ? set_movement_validation_flags(FALSE, row_1 == TWO, row_2 == EIGHT, FALSE, FALSE, FALSE, FALSE, FALSE) : set_movement_validation_flags(FALSE, row_1 == SEVEN, row_2 == ONE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            }
             return TRUE;
         }
         else if (row_2 == row_1 + pawn_direction && abs(col_2 - col_1) == 1) {
             // Capture
             if (squares_have_opposite_colour_pieces((Square){.col = col_1, .row = row_1}, (Square){.col = col_2, .row = row_2})) {
                 // Standard
-                turn == WHITE ? set_movement_validation_flags(FALSE, row_1 == TWO, row_2 == EIGHT, FALSE, FALSE, FALSE, FALSE, FALSE) : set_movement_validation_flags(FALSE, row_1 == SEVEN, row_2 == ONE, FALSE, FALSE, FALSE, FALSE, FALSE);
+                if (!preserve_validation_flags) {
+                    turn == WHITE ? set_movement_validation_flags(FALSE, row_1 == TWO, row_2 == EIGHT, FALSE, FALSE, FALSE, FALSE, FALSE) : set_movement_validation_flags(FALSE, row_1 == SEVEN, row_2 == ONE, FALSE, FALSE, FALSE, FALSE, FALSE);
+                }
                 return TRUE;
             }
             else if (destination_square == EMPTY_SQUARE && ARE_SQUARES_EQUAL(((Square){.col = col_2, .row = row_1}), get_en_passantable_square()) && squares_have_opposite_colour_pieces((Square){.col = col_1, .row = row_1}, (Square){.col = col_2, .row = row_1})) {
                 // En passant
-                set_movement_validation_flags(FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE);
+                }
                 return TRUE;
             }
         }
-        else if (row_2 == row_1 + pawn_direction*2 && col_2 == col_1 && destination_square == EMPTY_SQUARE && get_square_content(col_1, row_1 + pawn_direction) == EMPTY_SQUARE && ((turn == WHITE && get_white_pawn_special_move_status(col_1)) || (turn == BLACK && get_black_pawn_special_move_status(col_1)))) {
+        else if (row_2 == row_1 + pawn_direction*2 && col_2 == col_1 && destination_square == EMPTY_SQUARE && get_square_content(col_1, row_1 + pawn_direction) == EMPTY_SQUARE && ((turn == WHITE && get_white_pawn_special_move_privileges(col_1) && row_1 == TWO) || (turn == BLACK && get_black_pawn_special_move_privileges(col_1) && row_1 == SEVEN))) {
             // Special move
-            set_movement_validation_flags(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            if (!preserve_validation_flags) {
+                set_movement_validation_flags(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            }
             return TRUE;
         }
     }
     else if (piece == WHITE_KNIGHT || piece == BLACK_KNIGHT) {
         if (((abs(row_2 - row_1) == 2 && abs(col_2 - col_1) == 1) || (abs(row_2 - row_1) == 1 && abs(col_2 - col_1) == 2))) {
-            set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            if (!preserve_validation_flags) {
+                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            }
             return TRUE;
         }
     }
     else if (piece == WHITE_BISHOP || piece == BLACK_BISHOP) {
         if ((abs(row_change) == abs(col_change) && is_path_clear(row_1, col_1, row_2, col_2))) {
-            set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            if (!preserve_validation_flags) {
+                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            }
             return TRUE;
         }
     }
     else if (piece == WHITE_ROOK || piece == BLACK_ROOK) {
         if (((row_1 == row_2 || col_1 == col_2) && is_path_clear(row_1, col_1, row_2, col_2))) {
             if (col_1 == H && ((turn == WHITE && white_has_short_castle_privileges) || (turn == BLACK && black_has_short_castle_privileges))) {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE);
+                }
             }
             else if (col_1 == A && ((turn == WHITE && white_has_long_castle_privileges) || (turn == BLACK && black_has_long_castle_privileges))) {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE);
+                }
             }
             else {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+                }
             }
             return TRUE;
         }
     }
     else if (piece == WHITE_QUEEN || piece == BLACK_QUEEN) {
         if (((abs(row_change) == abs(col_change) || row_1 == row_2 || col_1 == col_2) && is_path_clear(row_1, col_1, row_2, col_2))) {
-            set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            if (!preserve_validation_flags) {
+                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE);
+            }
             return TRUE;
         }
     }
     else if (piece == WHITE_KING) {
         // Standard movement
         if ((row_change == 0 || abs(row_change) == 1) && (col_change == 0 || abs(col_change) == 1)) {
-            set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE);
+            if (!preserve_validation_flags) {
+                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE);
+            }
             return TRUE;
         }
         else if (row_1 == ONE && col_1 == E && row_2 == ONE) {
             if (get_white_short_castle_privileges() && col_2 == G && get_square_content(F, ONE) == EMPTY_SQUARE && get_square_content(G, ONE) == EMPTY_SQUARE && get_square_content(H, ONE) == WHITE_ROOK) {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE);
+                }
                 return TRUE;
             }
             else if (get_white_long_castle_privileges() && col_2 == C && get_square_content(D, ONE) == EMPTY_SQUARE && get_square_content(C, ONE) == EMPTY_SQUARE && get_square_content(B, ONE) == EMPTY_SQUARE && get_square_content(A, ONE) == WHITE_ROOK) {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE);
+                }
                 return TRUE;
             }
         }
@@ -594,16 +637,22 @@ bool piece_can_move(uint8_t row_1, uint8_t col_1, uint8_t row_2, uint8_t col_2) 
     else if (piece == BLACK_KING) {
         // Standard movement
         if ((row_change == 0 || abs(row_change) == 1) && (col_change == 0 || abs(col_change) == 1)) {
-            set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE);
+            if (!preserve_validation_flags) {
+                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE);
+            }
             return TRUE;
         }
         else if (row_1 == EIGHT && col_1 == E && row_2 == EIGHT) {
             if (get_black_short_castle_privileges() && col_2 == G && get_square_content(F, EIGHT) == EMPTY_SQUARE && get_square_content(G, EIGHT) == EMPTY_SQUARE && get_square_content(H, EIGHT) == BLACK_ROOK) {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE);
+                }
                 return TRUE;
             }
             else if (get_black_long_castle_privileges() && col_2 == C && get_square_content(D, EIGHT) == EMPTY_SQUARE && get_square_content(C, EIGHT) == EMPTY_SQUARE && get_square_content(B, EIGHT) == EMPTY_SQUARE && get_square_content(A, EIGHT) == BLACK_ROOK) {
-                set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE);
+                if (!preserve_validation_flags) {
+                    set_movement_validation_flags(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE);
+                }
                 return TRUE;
             }
         }
@@ -647,12 +696,7 @@ void move_start_to_end() {
     
     // Special moves
     if (attempting_special_pawn_move) {
-        if (turn == WHITE) {
-            set_white_pawn_special_move_status(move_to_make.end.col, FALSE);
-        }
-        else {
-            set_black_pawn_special_move_status(move_to_make.end.col, FALSE);
-        }
+
     }
     else if (attempting_short_castle) {
         if (turn == WHITE) {
@@ -695,12 +739,7 @@ void undo_move_start_to_end() {
 
     // Special moves
     if (attempting_special_pawn_move) {
-        if (turn == WHITE) {
-            set_white_pawn_special_move_status(move_to_make.end.col, TRUE);
-        }
-        else {
-            set_black_pawn_special_move_status(move_to_make.end.col, TRUE);
-        }
+
     }
     else if (attempting_short_castle) {
         if (turn == WHITE) {
@@ -784,8 +823,8 @@ void reset_game_data() {
     if (!debug) {
         previous_result = RESULT_NONE;
         turn = WHITE;
-        white_pawns_special_move_status = 0xFF;
-        black_pawns_special_move_status = 0xFF;
+        white_pawns_special_move_privileges = 0xFF;
+        black_pawns_special_move_privileges = 0xFF;
         white_has_short_castle_privileges = TRUE;
         black_has_short_castle_privileges = TRUE;
         white_has_long_castle_privileges = TRUE;
@@ -794,16 +833,13 @@ void reset_game_data() {
         white_king_square = (Square){.row = 7, .col = 4};
         black_king_square = (Square){.row = 0, .col = 4};
         king_in_check = FALSE;
-        attempting_special_pawn_move = FALSE;
-        attempting_en_passant = FALSE;
-        attempting_short_castle = FALSE;
-        attempting_long_castle = FALSE;
-        attempting_promotion = FALSE;
+        reset_movement_validation_flags();
         direction = UP;
         promotion = KNIGHT;
         highlighted_square = (Square){.row = 7, .col = 0};
         selected_square = (Square){.row = -1, .col = -1};
         initialize_last_eight_moves();
+        fifty_move_rule_counter = 0;
 
         if (puzzle_mode) {
             if (current_puzzle == 0) {
@@ -817,31 +853,30 @@ void reset_game_data() {
             }
         }
         else {
-            reset_board();
+            if (!get_skip_reset()) {
+                reset_board();
+            }
         }
     }
     else {
         previous_result = RESULT_NONE;
-        turn = WHITE;
-        white_pawns_special_move_status = 0xFF;
-        black_pawns_special_move_status = 0xFF;
-        white_has_short_castle_privileges = TRUE;
-        black_has_short_castle_privileges = FALSE;
+        turn = BLACK;
+        white_pawns_special_move_privileges = 0b11111001;
+        black_pawns_special_move_privileges = 0b11110001;
+        white_has_short_castle_privileges = FALSE;
+        black_has_short_castle_privileges = TRUE;
         white_has_long_castle_privileges = FALSE;
-        black_has_long_castle_privileges = FALSE;
+        black_has_long_castle_privileges = TRUE;
         en_passantable_square = (Square){.row = -1, .col = -1};
-        white_king_square = (Square){.row = ONE, .col = E};
+        white_king_square = (Square){.row = ONE, .col = F};
         black_king_square = (Square){.row = EIGHT, .col = E};
         king_in_check = FALSE;
-        attempting_special_pawn_move = FALSE;
-        attempting_en_passant = FALSE;
-        attempting_short_castle = FALSE;
-        attempting_long_castle = FALSE;
-        attempting_promotion = FALSE;
+        reset_movement_validation_flags();
         direction = UP;
         promotion = KNIGHT;
         highlighted_square = (Square){.col = A, .row = ONE};
         selected_square = (Square){.row = -1, .col = -1};
         initialize_last_eight_moves();
+        fifty_move_rule_counter = 0;
     }
 }

@@ -100,6 +100,10 @@ static void Selecting_Square(void);
 static void ChessAppSM_Error(void);
 static void Process_Valid_Move(void);
 static void Setup_Post_Move_Analysis(void);
+static void Post_Move_Check_Is_Draw_By_Fifty_Move_Rule(void);
+static void Draw_Board(void);
+static void Draw_Interface(void);
+bool get_skip_reset();
 
 /* chess_utils.c */
 void print_str (u8 str[]);
@@ -116,13 +120,19 @@ void dequeue(Queue* q);
 fnCode_type get_front(Queue* q);
 
 /* chess_lcd.c */
+uint8_t get_menu_parts_drawn();
+void set_menu_parts_drawn(uint8_t new_val);
+uint8_t get_board_parts_drawn();
+void set_board_parts_drawn(uint8_t new_val);
+uint8_t get_interface_parts_drawn();
+void set_interface_parts_drawn(uint8_t new_val);
 void flash_arrow(MovementDirection direction);
 void draw_movement_direction(MovementDirection direction);
 PixelAddressType get_square_pixel_coordinates(uint8_t rank_index, uint8_t file_index);
 void draw_player_symbols(Colour turn);
 void draw_turn_symbol();
 void draw_movement_symbol();
-void draw_menu(GameResult previous_result, Colour turn);
+void draw_menu();
 void draw_line(int start_row, int start_col, int length, int row_increment, int col_increment);
 void colour_square(int square_row, int square_col);
 void draw_selected_square_indicator(Square square);
@@ -136,6 +146,10 @@ void set_check_indicator();
 void draw_error_message();
 
 /* chess_game.c */
+void set_fifty_move_rule_counter(int8_t new_val);
+int8_t get_fifty_move_rule_counter();
+void set_preserve_validation_flags(bool state);
+bool get_preserve_validation_flags();
 void set_current_puzzle(uint8_t puzzle);
 uint8_t get_current_puzzle();
 void set_puzzle_mode(bool state);
@@ -168,10 +182,10 @@ void set_attempting_long_castle(bool new_status);
 bool get_attempting_long_castle();
 void set_attempting_en_passant(bool new_status);
 bool get_attempting_en_passant();
-void set_white_pawn_special_move_status(uint8_t file, bool new_status);
-bool get_white_pawn_special_move_status(uint8_t file);
-void set_black_pawn_special_move_status(uint8_t file, bool new_status);
-bool get_black_pawn_special_move_status(uint8_t file);
+void remove_white_pawn_special_move_privileges(uint8_t file);
+bool get_white_pawn_special_move_privileges(uint8_t file);
+void remove_black_pawn_special_move_privileges(uint8_t file);
+bool get_black_pawn_special_move_privileges(uint8_t file);
 Square get_en_passantable_square();
 void set_en_passantable_square(Square new_en_passantable_square);
 MovementDirection get_direction();
@@ -282,6 +296,10 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 #define PART_TWO 2
 #define NO_DEBUG_ACTION 5
 #define DEBUG_TIMER_MAX 500
+#define UNDEFINED_COLOUR (uint8_t)2
+#define MENU_PARTS (uint8_t)6
+#define BOARD_PARTS (uint8_t)4
+#define INTERFACE_PARTS (uint8_t)5
 
 /* Bitmaps */
 /*** Selected Square ***/

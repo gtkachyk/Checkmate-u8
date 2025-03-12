@@ -9,6 +9,34 @@ static const u8* piece_sprites[13] = {
     &black_pawn[0][0], &black_knight[0][0], &black_bishop[0][0], &black_rook[0][0], &black_queen[0][0], &black_king[0][0]
 };
 
+static uint8_t menu_parts_drawn = 0;
+static uint8_t board_parts_drawn = 0;
+static uint8_t interface_parts_drawn = 0;
+
+uint8_t get_menu_parts_drawn() {
+    return menu_parts_drawn;
+}
+
+void set_menu_parts_drawn(uint8_t new_val) {
+    menu_parts_drawn = new_val;
+}
+
+uint8_t get_board_parts_drawn() {
+    return board_parts_drawn;
+}
+
+void set_board_parts_drawn(uint8_t new_val) {
+    board_parts_drawn = new_val;
+}
+
+uint8_t get_interface_parts_drawn() {
+    return interface_parts_drawn;
+}
+
+void set_interface_parts_drawn(uint8_t new_val) {
+    interface_parts_drawn = new_val;
+}
+
 void draw_piece(uint8_t piece, uint8_t rank, uint8_t file) {
     PixelAddressType pixel_coords = get_square_pixel_coordinates(rank, file);
     PixelBlockType image = {
@@ -51,33 +79,51 @@ void draw_pieces() {
 }
 
 void draw_board() {
-    LcdClearScreen();
-    int board_pixel_dimensions = (SQUARE_PIXEL_SIZE * BOARD_SIZE) + 1;
-    int outer_board_dimensions = board_pixel_dimensions + 1;
-    int top_row = BOARD_BOTTOM_LEFT_PIXEL_ROW + (BOARD_SIZE * SQUARE_PIXEL_SIZE * DISPLAY_ROW_DIRECTION) + DISPLAY_ROW_DIRECTION;
-    int bottom_row = BOARD_BOTTOM_LEFT_PIXEL_ROW - DISPLAY_ROW_DIRECTION;
-    int left_col = BOARD_BOTTOM_LEFT_PIXEL_COL - DISPLAY_COL_DIRECTION;
-    int right_col = BOARD_BOTTOM_LEFT_PIXEL_COL + (BOARD_SIZE * SQUARE_PIXEL_SIZE * DISPLAY_COL_DIRECTION) + DISPLAY_COL_DIRECTION;
-    
-    // Draw border
-    draw_line(top_row + (1 * DISPLAY_COL_DIRECTION), left_col, outer_board_dimensions, 0, DISPLAY_COL_DIRECTION); // Top border
-    draw_line(bottom_row, left_col, outer_board_dimensions, 0, DISPLAY_COL_DIRECTION); // Bottom border
-    draw_line(bottom_row, left_col, outer_board_dimensions, DISPLAY_ROW_DIRECTION, 0); // Left border
-    draw_line(bottom_row, right_col + (1 * DISPLAY_ROW_DIRECTION), outer_board_dimensions, DISPLAY_ROW_DIRECTION, 0); // Right border
-
-    // Colour squares
-    for (int row = 0; row < BOARD_SIZE; row++) {
-        for (int col = 0; col < BOARD_SIZE; col++) {
-            if ((row + col) % 2 != 1) {
-                int square_row = BOARD_BOTTOM_LEFT_PIXEL_ROW + (row * SQUARE_PIXEL_SIZE * DISPLAY_ROW_DIRECTION);
-                int square_col = BOARD_BOTTOM_LEFT_PIXEL_COL + (col * SQUARE_PIXEL_SIZE * DISPLAY_COL_DIRECTION);
-                colour_square(square_row, square_col);
-            }
-        }
+    if (board_parts_drawn == 0) {
+        LcdClearScreen();
+        board_parts_drawn++;
+        return;
     }
 
-    // Draw pieces
-    draw_pieces();
+    if (board_parts_drawn == 1) {
+        int board_pixel_dimensions = (SQUARE_PIXEL_SIZE * BOARD_SIZE) + 1;
+        int outer_board_dimensions = board_pixel_dimensions + 1;
+        int top_row = BOARD_BOTTOM_LEFT_PIXEL_ROW + (BOARD_SIZE * SQUARE_PIXEL_SIZE * DISPLAY_ROW_DIRECTION) + DISPLAY_ROW_DIRECTION;
+        int bottom_row = BOARD_BOTTOM_LEFT_PIXEL_ROW - DISPLAY_ROW_DIRECTION;
+        int left_col = BOARD_BOTTOM_LEFT_PIXEL_COL - DISPLAY_COL_DIRECTION;
+        int right_col = BOARD_BOTTOM_LEFT_PIXEL_COL + (BOARD_SIZE * SQUARE_PIXEL_SIZE * DISPLAY_COL_DIRECTION) + DISPLAY_COL_DIRECTION;
+        
+        // Draw border
+        draw_line(top_row + (1 * DISPLAY_COL_DIRECTION), left_col, outer_board_dimensions, 0, DISPLAY_COL_DIRECTION); // Top border
+        draw_line(bottom_row, left_col, outer_board_dimensions, 0, DISPLAY_COL_DIRECTION); // Bottom border
+        draw_line(bottom_row, left_col, outer_board_dimensions, DISPLAY_ROW_DIRECTION, 0); // Left border
+        draw_line(bottom_row, right_col + (1 * DISPLAY_ROW_DIRECTION), outer_board_dimensions, DISPLAY_ROW_DIRECTION, 0); // Right border
+
+        board_parts_drawn++;
+        return;
+    }
+
+    if (board_parts_drawn == 2) {
+        // Colour squares
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col = 0; col < BOARD_SIZE; col++) {
+                if ((row + col) % 2 != 1) {
+                    int square_row = BOARD_BOTTOM_LEFT_PIXEL_ROW + (row * SQUARE_PIXEL_SIZE * DISPLAY_ROW_DIRECTION);
+                    int square_col = BOARD_BOTTOM_LEFT_PIXEL_COL + (col * SQUARE_PIXEL_SIZE * DISPLAY_COL_DIRECTION);
+                    colour_square(square_row, square_col);
+                }
+            }
+        }
+        board_parts_drawn++;
+        return;
+    }
+
+    if (board_parts_drawn == 3) {
+        // Draw pieces
+        draw_pieces();
+        board_parts_drawn++;
+        return;
+    }
 }
 
 void draw_error_message() {
@@ -86,55 +132,78 @@ void draw_error_message() {
     LcdLoadString("ERROR", LCD_FONT_SMALL, &sTargetPixel);
 }
 
-void draw_menu(GameResult previous_result, Colour turn) {
-    LcdClearScreen();
-    PixelAddressType sTargetPixel = {5, 52};
-    LcdLoadString("Menu", LCD_FONT_SMALL, &sTargetPixel);
+void draw_menu() {
+    if (menu_parts_drawn == 0) {
+        LcdClearScreen();
+        menu_parts_drawn++;
+        return;
+    }
 
-    sTargetPixel.u16PixelRowAddress = 15;
-    sTargetPixel.u16PixelColumnAddress = 10;
-    LcdLoadString("Button 0 - New Game", LCD_FONT_SMALL, &sTargetPixel);
+    if (menu_parts_drawn == 1) {
+        PixelAddressType sTargetPixel = {5, 52};
+        LcdLoadString("Menu", LCD_FONT_SMALL, &sTargetPixel);
+        menu_parts_drawn++;
+        return;
+    }
 
-    sTargetPixel.u16PixelRowAddress = 28;
-    sTargetPixel.u16PixelColumnAddress = 10;
-    unsigned char puzzle_str[20];
-    sprintf(puzzle_str, "Button 1 - Puzzle %d", get_current_puzzle() + 1);
-    LcdLoadString(puzzle_str, LCD_FONT_SMALL, &sTargetPixel);
+    if (menu_parts_drawn == 2) {
+        PixelAddressType sTargetPixel = {15, 10};
+        LcdLoadString("Button 0 - New Game", LCD_FONT_SMALL, &sTargetPixel);
+        menu_parts_drawn++;
+        return;
+    }
 
-    sTargetPixel.u16PixelRowAddress = 40;
-    sTargetPixel.u16PixelColumnAddress = 25;
-    if (previous_result == RESULT_CHECKMATE) {
-        if (turn == BLACK) {
-            LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
-        }
-        else {
-            LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
-        }
-        sTargetPixel.u16PixelRowAddress = 50;
-        sTargetPixel.u16PixelColumnAddress = 35;
-        LcdLoadString("checkmate!", LCD_FONT_SMALL, &sTargetPixel);
+    if (menu_parts_drawn == 3) {
+        PixelAddressType sTargetPixel = {28, 10};
+        unsigned char puzzle_str[20];
+        sprintf(puzzle_str, "Button 1 - Puzzle %d", get_current_puzzle() + 1);
+        LcdLoadString(puzzle_str, LCD_FONT_SMALL, &sTargetPixel);
+        menu_parts_drawn++;
+        return;
     }
-    else if (previous_result == RESULT_RESIGNATION) {
-        if (turn == BLACK) {
-            LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
+
+    if (menu_parts_drawn == 4) {
+        PixelAddressType sTargetPixel = {40, 25};
+        if (get_previous_result() == RESULT_CHECKMATE) {
+            if (get_turn() == BLACK) {
+                LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
+            }
+            else {
+                LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
+            }
+            sTargetPixel.u16PixelRowAddress = 50;
+            sTargetPixel.u16PixelColumnAddress = 35;
+            LcdLoadString("checkmate!", LCD_FONT_SMALL, &sTargetPixel);
         }
-        else {
-            LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
+        else if (get_previous_result() == RESULT_RESIGNATION) {
+            if (get_turn() == BLACK) {
+                LcdLoadString("Black wins by", LCD_FONT_SMALL, &sTargetPixel);
+            }
+            else {
+                LcdLoadString("White wins by", LCD_FONT_SMALL, &sTargetPixel);
+            }
+            sTargetPixel.u16PixelRowAddress = 50;
+            sTargetPixel.u16PixelColumnAddress = 30;
+            LcdLoadString("resignation!", LCD_FONT_SMALL, &sTargetPixel);
         }
-        sTargetPixel.u16PixelRowAddress = 50;
-        sTargetPixel.u16PixelColumnAddress = 30;
-        LcdLoadString("resignation!", LCD_FONT_SMALL, &sTargetPixel);
+        else if (get_previous_result() == RESULT_DRAW) {
+            sTargetPixel.u16PixelColumnAddress = 52;
+            LcdLoadString("Draw", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        else if (get_previous_result() == RESULT_PUZZLE_FAILED) {
+            sTargetPixel.u16PixelRowAddress = 45;
+            sTargetPixel.u16PixelColumnAddress = 20;
+            LcdLoadString("Puzzle failed :(", LCD_FONT_SMALL, &sTargetPixel);
+        }
+        menu_parts_drawn++;
+        return;
     }
-    else if (previous_result == RESULT_DRAW) {
-        sTargetPixel.u16PixelColumnAddress = 52;
-        LcdLoadString("Draw", LCD_FONT_SMALL, &sTargetPixel);
+
+    if (menu_parts_drawn == 5) {
+        set_check_indicator();
+        menu_parts_drawn++;
+        return;
     }
-    else if (previous_result == RESULT_PUZZLE_FAILED) {
-        sTargetPixel.u16PixelRowAddress = 45;
-        sTargetPixel.u16PixelColumnAddress = 20;
-        LcdLoadString("Puzzle failed :(", LCD_FONT_SMALL, &sTargetPixel);
-    }
-    set_check_indicator();
 }
 
 void draw_player_symbols(Colour turn) {
@@ -269,20 +338,39 @@ void highlight_square(Square square, uint8_t content, bool highlight_selected) {
     }
 }
 
-void draw_game_interface() {
-    draw_board();
-    draw_movement_direction(get_direction());
-    draw_player_symbols(get_turn());
-    draw_turn_symbol();
-    draw_movement_symbol();
-    set_check_indicator();
-}
-
 void set_check_indicator() {
     if (get_king_in_check()) {
         LedOn(RED3);
     }
     else {
         LedOff(RED3);
+    }
+}
+
+void draw_game_interface() {
+    if (interface_parts_drawn == 0) {
+        draw_movement_direction(get_direction());
+        interface_parts_drawn++;
+        return;
+    }
+    if (interface_parts_drawn == 1) {
+        draw_player_symbols(get_turn());
+        interface_parts_drawn++;
+        return;
+    }
+    if (interface_parts_drawn == 2) {
+        draw_turn_symbol();
+        interface_parts_drawn++;
+        return;
+    }
+    if (interface_parts_drawn == 3) {
+        draw_movement_symbol();
+        interface_parts_drawn++;
+        return;
+    }
+    if (interface_parts_drawn == 4) {
+        set_check_indicator();
+        interface_parts_drawn++;
+        return;
     }
 }

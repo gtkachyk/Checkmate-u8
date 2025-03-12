@@ -29,6 +29,7 @@ uint8_t debug_moves_size;
 static Move* debug_moves;
 static uint8_t* debug_inputs; // Max inputs is 50 with current implementation
 static uint8_t debug_timer = DEBUG_TIMER_MAX;
+bool skip_reset = FALSE; // Skips board reset upon starting a new game
 
 // Inter-state communication
 static uint8_t move_to_make_index = NO_MOVE;
@@ -48,162 +49,31 @@ static uint8_t y = 0;
 /************************************************************************************************/
 /***************************************** Test Setup *******************************************/
 /************************************************************************************************/
-void create_game_1_moves() {
-    debug_moves[0] = create_move(E, TWO, E, FOUR, NO_PROMOTION);
-    debug_moves[1] = create_move(E, SEVEN, E, FIVE, NO_PROMOTION);
-
-    debug_moves[2] = create_move(G, ONE, F, THREE, NO_PROMOTION);
-    debug_moves[3] = create_move(B, EIGHT, C, SIX, NO_PROMOTION);
-
-    debug_moves[4] = create_move(D, TWO, D, FOUR, NO_PROMOTION);
-    debug_moves[5] = create_move(E, FIVE, D, FOUR, NO_PROMOTION);
-
-    debug_moves[6] = create_move(F, ONE, C, FOUR, NO_PROMOTION);
-    debug_moves[7] = create_move(F, EIGHT, C, FIVE, NO_PROMOTION);
-
-    debug_moves[8] = create_move(C, TWO, C, THREE, NO_PROMOTION);
-    debug_moves[9] = create_move(D, FOUR, C, THREE, NO_PROMOTION);
-
-    debug_moves[10] = create_move(C, FOUR, F, SEVEN, NO_PROMOTION);
-    debug_moves[11] = create_move(E, EIGHT, F, SEVEN, NO_PROMOTION);
-
-    debug_moves[12] = create_move(D, ONE, D, FIVE, NO_PROMOTION);
-    debug_moves[13] = create_move(F, SEVEN, E, EIGHT, NO_PROMOTION);
-
-    debug_moves[14] = create_move(D, FIVE, H, FIVE, NO_PROMOTION);
-    debug_moves[15] = create_move(G, SEVEN, G, SIX, NO_PROMOTION);
-
-    debug_moves[16] = create_move(H, FIVE, C, FIVE, NO_PROMOTION);
-    debug_moves[17] = create_move(D, SEVEN, D, SIX, NO_PROMOTION);
-
-    debug_moves[18] = create_move(C, FIVE, C, THREE, NO_PROMOTION);
-    debug_moves[19] = create_move(C, EIGHT, G, FOUR, NO_PROMOTION);
-
-    debug_moves[20] = create_move(C, THREE, H, EIGHT, NO_PROMOTION);
-    debug_moves[21] = create_move(G, FOUR, F, THREE, NO_PROMOTION);
-
-    debug_moves[22] = create_move(H, EIGHT, G, EIGHT, NO_PROMOTION);
-    debug_moves[23] = create_move(E, EIGHT, D, SEVEN, NO_PROMOTION);
-
-    debug_moves[24] = create_move(G, EIGHT, F, SEVEN, NO_PROMOTION);
-    debug_moves[25] = create_move(D, EIGHT, E, SEVEN, NO_PROMOTION);
-
-    debug_moves[26] = create_move(F, SEVEN, F, THREE, NO_PROMOTION);
-    debug_moves[27] = create_move(A, EIGHT, F, EIGHT, NO_PROMOTION);
-
-    debug_moves[28] = create_move(F, THREE, G, FOUR, NO_PROMOTION);
-    debug_moves[29] = create_move(D, SEVEN, D, EIGHT, NO_PROMOTION);
-
-    debug_moves[30] = create_move(E, ONE, G, ONE, NO_PROMOTION);
-    debug_moves[31] = create_move(C, SIX, D, FOUR, NO_PROMOTION);
-
-    debug_moves[32] = create_move(G, FOUR, D, ONE, NO_PROMOTION);
-    debug_moves[33] = create_move(E, SEVEN, E, FOUR, NO_PROMOTION);
-
-    debug_moves[34] = create_move(C, ONE, G, FIVE, NO_PROMOTION);
-    debug_moves[35] = create_move(D, EIGHT, C, EIGHT, NO_PROMOTION);
-
-    debug_moves[36] = create_move(F, ONE, E, ONE, NO_PROMOTION);
-    debug_moves[37] = create_move(E, FOUR, F, FIVE, NO_PROMOTION);
-
-    debug_moves[38] = create_move(G, FIVE, E, THREE, NO_PROMOTION);
-    debug_moves[39] = create_move(D, FOUR, C, SIX, NO_PROMOTION);
-
-    debug_moves[40] = create_move(B, ONE, C, THREE, NO_PROMOTION);
-    debug_moves[41] = create_move(C, SIX, E, FIVE, NO_PROMOTION);
-
-    debug_moves[42] = create_move(H, TWO, H, THREE, NO_PROMOTION);
-    debug_moves[43] = create_move(H, SEVEN, H, FIVE, NO_PROMOTION);
-
-    debug_moves[44] = create_move(C, THREE, D, FIVE, NO_PROMOTION);
-    debug_moves[45] = create_move(F, EIGHT, F, SEVEN, NO_PROMOTION);
-
-    debug_moves[46] = create_move(E, THREE, F, FOUR, NO_PROMOTION);
-    debug_moves[47] = create_move(G, SIX, G, FIVE, NO_PROMOTION);
-
-    debug_moves[48] = create_move(F, FOUR, E, FIVE, NO_PROMOTION);
-    debug_moves[49] = create_move(D, SIX, E, FIVE, NO_PROMOTION);
-
-    debug_moves[50] = create_move(D, ONE, E, TWO, NO_PROMOTION);
-    debug_moves[51] = create_move(G, FIVE, G, FOUR, NO_PROMOTION);
-
-    debug_moves[52] = create_move(E, TWO, E, FIVE, NO_PROMOTION);
-    debug_moves[53] = create_move(F, FIVE, F, TWO, NO_PROMOTION);
-
-    debug_moves[54] = create_move(G, ONE, H, ONE, NO_PROMOTION);
-    debug_moves[55] = create_move(B, SEVEN, B, SIX, NO_PROMOTION);
-
-    debug_moves[56] = create_move(D, FIVE, E, SEVEN, NO_PROMOTION);
-    debug_moves[57] = create_move(C, EIGHT, B, EIGHT, NO_PROMOTION);
-
-    debug_moves[58] = create_move(E, SEVEN, C, SIX, NO_PROMOTION);
-    debug_moves[59] = create_move(B, EIGHT, C, EIGHT, NO_PROMOTION);
-
-    debug_moves[60] = create_move(A, ONE, D, ONE, NO_PROMOTION);
-    debug_moves[61] = create_move(G, FOUR, H, THREE, NO_PROMOTION);
-
-    debug_moves[62] = create_move(E, FIVE, E, SIX, NO_PROMOTION);
-    debug_moves[63] = create_move(C, EIGHT, B, SEVEN, NO_PROMOTION);
-
-    debug_moves[64] = create_move(C, SIX, D, EIGHT, NO_PROMOTION);
-    debug_moves[65] = create_move(B, SEVEN, B, EIGHT, NO_PROMOTION);
-
-    debug_moves[66] = create_move(E, SIX, E, TWO, NO_PROMOTION);
-    debug_moves[67] = create_move(H, THREE, G, TWO, NO_PROMOTION);
-
-    debug_moves[68] = create_move(H, ONE, H, TWO, NO_PROMOTION);
-    debug_moves[69] = create_move(G, TWO, G, ONE, QUEEN);
-
-    debug_moves[70] = create_move(H, TWO, H, THREE, NO_PROMOTION);
-    debug_moves[71] = create_move(G, ONE, G, THREE, NO_PROMOTION);
+bool get_skip_reset() {
+    return skip_reset;
 }
 
-void create_test_moves() {
-    debug_moves[0] = create_move(E, TWO, E, FOUR, NO_PROMOTION);
-    debug_moves[1] = create_move(E, SEVEN, E, FIVE, NO_PROMOTION);
-
-    debug_moves[2] = create_move(D, ONE, H, FIVE, NO_PROMOTION);
-    debug_moves[3] = create_move(B, EIGHT, C, SIX, NO_PROMOTION);
-
-    debug_moves[4] = create_move(H, FIVE, F, SEVEN, NO_PROMOTION);
-    debug_moves[5] = create_move(E, EIGHT, F, SEVEN, NO_PROMOTION);
-
-    debug_moves[6] = create_move(D, TWO, D, THREE, NO_PROMOTION);
-    debug_moves[7] = create_move(F, SEVEN, G, SIX, NO_PROMOTION);
-
-    debug_moves[8] = create_move(D, THREE, D, FOUR, NO_PROMOTION);
-    debug_moves[9] = create_move(G, SIX, H, FIVE, NO_PROMOTION);
-
-    debug_moves[10] = create_move(D, FOUR, D, FIVE, NO_PROMOTION);
-    debug_moves[11] = create_move(H, FIVE, H, SIX, NO_PROMOTION);
-
-    debug_moves[12] = create_move(D, FIVE, D, SIX, NO_PROMOTION);
-    debug_moves[13] = create_move(H, SIX, H, SEVEN, NO_PROMOTION);
-
-    debug_moves[14] = create_move(D, SIX, D, SEVEN, NO_PROMOTION);
-    debug_moves[15] = create_move(H, SEVEN, H, EIGHT, NO_PROMOTION);
+void create_game_1_moves() {
 }
 
 void create_debug_moves() {
-    debug_moves_size = 16;
+    debug_moves_size = 1;
     debug_moves = (Move*)malloc(debug_moves_size * sizeof(Move));
     if (debug_moves == NULL) {
         draw_error_message();
         ChessApp_pfStateMachine = ChessAppSM_Error;
         return;
     }
-    debug_inputs = (uint8_t*)malloc(64);
+    debug_inputs = (uint8_t*)malloc(64 * sizeof(uint8_t));
     if (debug_inputs == NULL) {
         draw_error_message();
         ChessApp_pfStateMachine = ChessAppSM_Error;
         return;
     }
-    create_test_moves();
-    // create_game_1_moves(); // set size to 72
+    create_game_1_moves();
 }
 
 void add_debug_input(uint8_t* index, uint8_t value) {
-    // print_int_var("value", value);
     debug_inputs[*index] = value;
     *index = *index + 1;
 }
@@ -278,19 +148,47 @@ void generate_button_input(Move move, uint8_t index) {
     debug_inputs_size = index;
 }
 
-void resign() {
-    set_king_in_check(FALSE);
-    set_check_indicator();
-    set_previous_result(RESULT_RESIGNATION);
-    draw_menu(get_previous_result(), get_turn());
-    ChessApp_pfStateMachine = Chess_Menu;
-}
-
 /************************************************************************************************/
 /*************************************** Miscellaneous ******************************************/
 /************************************************************************************************/
+
+// Games must only end by calling this function
+void end_game(GameResult result) {
+    // If puzzle mode and the current puzzle is passed (currently, all puzzles are mate in one)
+    if (get_puzzle_mode() && result == RESULT_CHECKMATE) {
+        if (get_current_puzzle() == 2) {
+            set_current_puzzle(0);
+        }
+        else {
+            set_current_puzzle(get_current_puzzle() + 1);
+        }
+    }
+    set_king_in_check(FALSE);
+    set_previous_result(result);
+    change_turn();
+    ChessApp_pfStateMachine = Chess_Menu;
+}
+
+// Precondition: move_to_make has been validated but not reflected in the board
+void update_fifty_move_counter() {
+    // If the player moves a pawn or captures material
+    uint8_t piece_to_move = get_square_content(get_move_to_make().start.col, get_move_to_make().start.row); // get move to make is wrong
+    if (piece_to_move == WHITE_PAWN || piece_to_move == BLACK_PAWN || get_attempting_en_passant() || get_square_content(get_move_to_make().end.col, get_move_to_make().end.row) != EMPTY_SQUARE) {
+        if (get_turn() == WHITE) {
+            set_fifty_move_rule_counter(-1);
+        }
+        else {
+            set_fifty_move_rule_counter(0);
+        }
+    }
+    else {
+        set_fifty_move_rule_counter(get_fifty_move_rule_counter() + 1);
+    }
+}
+
 void queue_post_move_analysis() {
     analysis_mode = TRUE;
+    enqueue(&state_queue, &Post_Move_Check_Is_Draw_By_Fifty_Move_Rule);
     enqueue(&state_queue, &Post_Move_Check_Is_Draw_By_Repetition); // Check if the 2nd and 1st most recent moves are identical to the 4th and 3rd most recent moves
     enqueue(&state_queue, &Post_Move_Check_Is_In_Check); // Check if king is in check
     enqueue(&state_queue, &Post_Move_Check_Is_Sufficient_Material); // Check if there is sufficient material
@@ -364,22 +262,16 @@ void reset_app_data() {
     }
 }
 
-void setup_new_game() {
-    reset_app_data();
-    reset_game_data();
-    draw_game_interface();
-}
-
 void ChessAppInitialize(void) {
     if (TRUE) {
         if (debug) {
+            set_puzzle_mode(FALSE);
             reset_game_data();
             create_debug_moves();
             debug_inputs[0] = BUTTON1;
             generate_button_input(debug_moves[debug_moves_index], 1);
             debug_moves_index++;
         }
-        draw_menu(get_previous_result(), get_turn());
         state_queue = *(create_queue());
         ChessApp_pfStateMachine = Chess_Menu;
     }
@@ -401,23 +293,51 @@ void ChessAppInitialize(void) {
 
 /******************************************** Menu **********************************************/
 static void Chess_Menu(void) {
-    if (WasButtonPressed(BUTTON0)) {
+    if (get_menu_parts_drawn() != MENU_PARTS) {
+        draw_menu();
+    }
+    else if (WasButtonPressed(BUTTON0)) {
         ButtonAcknowledge(BUTTON0);
+        set_menu_parts_drawn(0);
         set_puzzle_mode(FALSE);
-        setup_new_game();
+        reset_app_data();
+        reset_game_data();
         enqueue(&state_queue, &Flash_Highlighted_Square);
         enqueue(&state_queue, &Flash_Movement_Indicator);
         return_state = Selecting_Direction;
-        ChessApp_pfStateMachine = Selecting_Direction;
+        ChessApp_pfStateMachine = Draw_Board;
     }
     else if (WasButtonPressed(BUTTON1)) {
         ButtonAcknowledge(BUTTON1);
+        set_menu_parts_drawn(0);
         set_puzzle_mode(TRUE);
-        setup_new_game();
+        reset_app_data();
+        reset_game_data();
         enqueue(&state_queue, &Flash_Highlighted_Square);
         enqueue(&state_queue, &Flash_Movement_Indicator);
         return_state = Selecting_Direction;
-        ChessApp_pfStateMachine = Selecting_Direction;
+        ChessApp_pfStateMachine = Draw_Board;
+    }
+}
+
+/***************************************** Interface ********************************************/
+static void Draw_Board(void) {
+    if (get_board_parts_drawn() != BOARD_PARTS) {
+        draw_board();
+    }
+    else {
+        set_board_parts_drawn(0);
+        ChessApp_pfStateMachine = Draw_Interface;
+    }
+}
+
+static void Draw_Interface(void) {
+    if (get_interface_parts_drawn() != INTERFACE_PARTS) {
+        draw_game_interface();
+    }
+    else {
+        set_interface_parts_drawn(0);
+        ChessApp_pfStateMachine = return_state;
     }
 }
 
@@ -546,7 +466,7 @@ static void Change_Promotion_Option(void) {
 /************************************** Move Invalidation ***************************************/
 /************************************************************************************************/
 // This state is entered after a move is invalidated
-static void Process_Invalid_Move(void) { // Untested
+static void Process_Invalid_Move(void) { // Currently unused and untested
     if (!analysis_mode) {
         enqueue(&state_queue, &Deselect_Selected_Square);
     }
@@ -568,6 +488,9 @@ static void Validate_Move_Piece_Movement(void) {
             ChessApp_pfStateMachine = Validate_Move_Castle_Through_Check;
         }
         else {
+            // Lock the movement validation flags
+            set_preserve_validation_flags(TRUE);
+
             // Move the piece
             move_start_to_end();
 
@@ -625,14 +548,77 @@ static void Validate_Move_Castle_Through_Check(void) {
     i = 0;
     j = 0;
     change_turn();
+    set_preserve_validation_flags(TRUE);
     move_start_to_end();
     change_turn();
     ChessApp_pfStateMachine = Validate_Move_Self_Inflicted_Check;
 }
 
+// Validate that the player is not in check after the move
+static void Validate_Move_Self_Inflicted_Check(void) {
+    while (i < BOARD_SIZE) {
+        while (j < BOARD_SIZE) {
+            // Get the current piece's color
+            Colour piece_colour = get_piece_colour(get_square_content(j, i));
+
+            // If an opponent's piece is found
+            if (piece_colour == get_turn()) {
+                // Get the king's position based on the turn
+                Square king_square = (get_turn() == WHITE) ? get_black_king_square() : get_white_king_square();
+
+                // Check if the opponent's piece can move to the king's square
+                if (piece_can_move(i, j, king_square.row, king_square.col)) {
+                    // Invalidate move and reset state
+                    change_turn();
+                    undo_move_start_to_end();
+
+                    // Unlock the movement validation flags
+                    set_preserve_validation_flags(FALSE);
+
+                    reset_movement_validation_flags();
+                    if (!analysis_mode) {
+                        enqueue(&state_queue, &Deselect_Selected_Square);
+                    }
+                    i = 0;
+                    j = 0;
+                    ChessApp_pfStateMachine = return_state;
+                    return;
+                } 
+
+                // Only analyze one move per call
+                j++;
+                return;
+            }
+            j++;
+        }
+        j = 0;
+        i++;
+    }
+
+    // Move is valid, proceed with game state updates
+    change_turn();
+    undo_move_start_to_end();
+
+    // Unlock the movement validation flags
+    set_preserve_validation_flags(FALSE);
+    
+    if (analysis_mode) {
+        set_has_valid_move(TRUE);
+    }
+    else {
+        enqueue(&state_queue, &Process_Valid_Move);
+    }
+    i = 0;
+    j = 0;
+    ChessApp_pfStateMachine = return_state;
+}
+
 // This state is entered after a move is validated
 static void Process_Valid_Move(void) {
     Colour player_colour = get_piece_colour(get_square_content(get_move_to_make().start.col, get_move_to_make().start.row));
+
+    // Update fifty move counter before updating board
+    update_fifty_move_counter();
 
     // Queue the states to update the lcd and board with the first part of the move
     move_to_make_index = PART_ONE;
@@ -662,68 +648,17 @@ static void Process_Valid_Move(void) {
     ChessApp_pfStateMachine = return_state;
 }
 
-// Validate that the player is not in check after the move
-static void Validate_Move_Self_Inflicted_Check(void) {
-    while (i < BOARD_SIZE) {
-        while (j < BOARD_SIZE) {
-            // Get the current piece's color
-            Colour piece_colour = get_piece_colour(get_square_content(j, i));
-
-            // If an opponent's piece is found
-            if (piece_colour == get_turn()) {
-                // Get the king's position based on the turn
-                Square king_square = (get_turn() == WHITE) ? get_black_king_square() : get_white_king_square();
-
-                // Check if the opponent's piece can move to the king's square
-                if (piece_can_move(i, j, king_square.row, king_square.col)) {
-                    // Invalidate move and reset state
-                    change_turn();
-                    undo_move_start_to_end();
-                    reset_movement_validation_flags();
-                    if (!analysis_mode) {
-                        enqueue(&state_queue, &Deselect_Selected_Square);
-                    }
-                    i = 0;
-                    j = 0;
-                    ChessApp_pfStateMachine = return_state;
-                    return;
-                } 
-
-                // Only analyze one move per call
-                j++;
-                return;
-            }
-            j++;
-        }
-        j = 0;
-        i++;
-    }
-
-    // Move is valid, proceed with game state updates
-    change_turn();
-    undo_move_start_to_end();
-    if (analysis_mode) {
-        set_has_valid_move(TRUE);
-    }
-    else {
-        enqueue(&state_queue, &Process_Valid_Move);
-    }
-    i = 0;
-    j = 0;
-    ChessApp_pfStateMachine = return_state;
-}
-
 /************************************************************************************************/
 /************************************* Post Move Validation *************************************/
 /************************************************************************************************/
-// All moves should end here
+// All valid moves should end here
 static void Setup_Post_Move_Analysis(void) {
     Colour player_colour = get_piece_colour(get_square_content(get_move_to_make().end.col, get_move_to_make().end.row));
 
     // Update data
     push_to_last_eight_moves(get_move_to_make());
     if (get_pawn_loses_special_move_privilege()) {
-        player_colour == WHITE ? set_white_pawn_special_move_status(get_move_to_make().start.col, FALSE) : set_black_pawn_special_move_status(get_move_to_make().start.col, FALSE);
+        player_colour == WHITE ? remove_white_pawn_special_move_privileges(get_move_to_make().start.col) : remove_black_pawn_special_move_privileges(get_move_to_make().start.col);
     }
     if (get_king_loses_short_castle_privileges()) {
         player_colour == WHITE ? set_white_short_castle_privileges(FALSE) : set_black_short_castle_privileges(FALSE);
@@ -741,7 +676,7 @@ static void Setup_Post_Move_Analysis(void) {
         set_en_passantable_square((Square){.row = get_move_to_make().end.row, .col = get_move_to_make().end.col});
     }
     else {
-        set_en_passantable_square((Square){.row = -1, .col = -1});
+        set_en_passantable_square(NULL_SQUARE);
     }
     set_has_valid_move(FALSE);
     set_king_in_check(FALSE);
@@ -762,14 +697,26 @@ static void Setup_Post_Move_Analysis(void) {
     ChessApp_pfStateMachine = return_state;
 }
 
+// Check if the result is a draw by fifty move rule
+static void Post_Move_Check_Is_Draw_By_Fifty_Move_Rule(void) {
+    if (get_fifty_move_rule_counter() == 100) {
+        // Game ends
+        end_game(RESULT_DRAW);
+    }
+    else {
+        // Game continues
+        ChessApp_pfStateMachine = return_state;
+    }
+}
+
 // Check if the result is a draw by repetition
 static void Post_Move_Check_Is_Draw_By_Repetition(void) {
     if (draw_by_repetition()) {
-        set_previous_result(RESULT_DRAW);
-        draw_menu(get_previous_result(), get_turn());
-        ChessApp_pfStateMachine = Chess_Menu;
+        // Game ends
+        end_game(RESULT_DRAW);
     }
     else {
+        // Game continues
         ChessApp_pfStateMachine = return_state;
     }
 }
@@ -811,12 +758,11 @@ static void Post_Move_Check_Is_In_Check(void) {
 // Check if there is sufficient material to continue
 static void Post_Move_Check_Is_Sufficient_Material(void) {
     if (insufficient_material()) {
-        set_previous_result(RESULT_DRAW);
-        set_king_in_check(FALSE);
-        draw_menu(get_previous_result(), get_turn());
-        ChessApp_pfStateMachine = Chess_Menu;
+        // Game ends
+        end_game(RESULT_DRAW);
     }
     else {
+        // Game continues
         ChessApp_pfStateMachine = return_state;
     }
 }
@@ -846,34 +792,26 @@ static void Post_Move_Check_Has_Valid_Move(void) {
             y = 0;
             x++;
         }
-        get_king_in_check() ? set_previous_result(RESULT_CHECKMATE) : set_previous_result(RESULT_DRAW);
-        set_king_in_check(FALSE);
-        if (get_puzzle_mode()) {
-            if (get_current_puzzle() == 2) {
-                set_current_puzzle(0);
-            }
-            else {
-                set_current_puzzle(get_current_puzzle() + 1);
-            }
-        }
-        draw_menu(get_previous_result(), !get_turn());
-        ChessApp_pfStateMachine = Chess_Menu;
+
+        // Game ends
+        get_king_in_check() ? end_game(RESULT_CHECKMATE) : end_game(RESULT_DRAW);
         return;
     }
-    x = 0;
-    y = 0;
-    k = 0;
-    l = 0;
-    reset_movement_validation_flags();
-    analysis_mode = FALSE;
-    controls_locked = FALSE;
+
     if (get_puzzle_mode()) {
-        set_previous_result(RESULT_PUZZLE_FAILED);
-        set_king_in_check(FALSE);
-        draw_menu(get_previous_result(), !get_turn());
-        ChessApp_pfStateMachine = Chess_Menu;
+        // Game ends
+        end_game(RESULT_PUZZLE_FAILED);
     }
     else {
+        // Game continues
+        x = 0;
+        y = 0;
+        k = 0;
+        l = 0;
+        set_move_to_make(NULL_MOVE);
+        reset_movement_validation_flags();
+        analysis_mode = FALSE;
+        controls_locked = FALSE;
         return_state = Selecting_Square;
         ChessApp_pfStateMachine = return_state;
     }
@@ -978,7 +916,7 @@ static void Selecting_Direction(void) {
     }
     else if (IsButtonHeld(BUTTON0, 5000)) {
         // Resign game
-        resign();
+        get_puzzle_mode() ? end_game(RESULT_PUZZLE_FAILED) : end_game(RESULT_RESIGNATION);
     }
 }
 
