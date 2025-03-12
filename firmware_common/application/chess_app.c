@@ -701,7 +701,7 @@ static void Setup_Post_Move_Analysis(void) {
 static void Post_Move_Check_Is_Draw_By_Fifty_Move_Rule(void) {
     if (get_fifty_move_rule_counter() == 100) {
         // Game ends
-        end_game(RESULT_DRAW);
+        get_puzzle_mode() ? end_game(RESULT_PUZZLE_FAILED) : end_game(RESULT_DRAW);
     }
     else {
         // Game continues
@@ -713,7 +713,7 @@ static void Post_Move_Check_Is_Draw_By_Fifty_Move_Rule(void) {
 static void Post_Move_Check_Is_Draw_By_Repetition(void) {
     if (draw_by_repetition()) {
         // Game ends
-        end_game(RESULT_DRAW);
+        get_puzzle_mode() ? end_game(RESULT_PUZZLE_FAILED) : end_game(RESULT_DRAW);
     }
     else {
         // Game continues
@@ -759,7 +759,7 @@ static void Post_Move_Check_Is_In_Check(void) {
 static void Post_Move_Check_Is_Sufficient_Material(void) {
     if (insufficient_material()) {
         // Game ends
-        end_game(RESULT_DRAW);
+        get_puzzle_mode() ? end_game(RESULT_PUZZLE_FAILED) : end_game(RESULT_DRAW);
     }
     else {
         // Game continues
