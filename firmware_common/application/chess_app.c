@@ -58,7 +58,7 @@ void create_game_1_moves() {
 }
 
 void create_debug_moves() {
-    debug_moves_size = 0;
+    debug_moves_size = 0; // Manually set to the size of the debug_moves array
     debug_moves = (Move*)malloc(debug_moves_size * sizeof(Move));
     if (debug_moves == NULL) {
         draw_error_message();
@@ -269,8 +269,7 @@ void ChessAppInitialize(void) {
             set_puzzle_mode(FALSE);
             reset_game_data();
             create_debug_moves();
-            debug_inputs[0] = BUTTON1;
-            generate_button_input(debug_moves[debug_moves_index], 1);
+            generate_button_input(debug_moves[debug_moves_index], 0);
             debug_moves_index++;
         }
         state_queue = *(create_queue());
@@ -831,8 +830,7 @@ static void Main_Menu(void) {
         reset_app_data();
         reset_game_data();
         enqueue(&state_queue, &Flash_Highlighted_Square);
-        enqueue(&state_queue, &Flash_Movement_Indicator);
-        return_state = Selecting_Direction;
+        return_state = Selecting_Square;
         ChessApp_pfStateMachine = Draw_Board;
     }
     else if (WasButtonPressed(BUTTON1)) {
@@ -841,8 +839,7 @@ static void Main_Menu(void) {
         reset_app_data();
         reset_game_data();
         enqueue(&state_queue, &Flash_Highlighted_Square);
-        enqueue(&state_queue, &Flash_Movement_Indicator);
-        return_state = Selecting_Direction;
+        return_state = Selecting_Square;
         ChessApp_pfStateMachine = Draw_Board;
     }
 }
