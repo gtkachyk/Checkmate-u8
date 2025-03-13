@@ -12,6 +12,7 @@ extern u8 G_u8DebugScanfCharCount;
 
 // State management
 static fnCode_type return_state;
+static int interface_draw_timer = INTERFACE_DRAW_TIMER_MAX;
 static int queue_timer = QUEUE_TIMER_MAX;
 static Queue state_queue;
 
@@ -57,7 +58,7 @@ void create_game_1_moves() {
 }
 
 void create_debug_moves() {
-    debug_moves_size = 1;
+    debug_moves_size = 0;
     debug_moves = (Move*)malloc(debug_moves_size * sizeof(Move));
     if (debug_moves == NULL) {
         draw_error_message();
@@ -166,7 +167,7 @@ void end_game(GameResult result) {
     set_king_in_check(FALSE);
     set_previous_result(result);
     change_turn();
-    ChessApp_pfStateMachine = Chess_Menu;
+    ChessApp_pfStateMachine = Draw_Menu;
 }
 
 // Precondition: move_to_make has been validated but not reflected in the board
@@ -273,7 +274,7 @@ void ChessAppInitialize(void) {
             debug_moves_index++;
         }
         state_queue = *(create_queue());
-        ChessApp_pfStateMachine = Chess_Menu;
+        ChessApp_pfStateMachine = Draw_Menu;
     }
     else {
         draw_error_message();
@@ -292,52 +293,46 @@ void ChessAppInitialize(void) {
 /************************************************************************************************/
 
 /******************************************** Menu **********************************************/
-static void Chess_Menu(void) {
-    if (get_menu_parts_drawn() != MENU_PARTS) {
-        draw_menu();
-    }
-    else if (WasButtonPressed(BUTTON0)) {
-        ButtonAcknowledge(BUTTON0);
-        set_menu_parts_drawn(0);
-        set_puzzle_mode(FALSE);
-        reset_app_data();
-        reset_game_data();
-        enqueue(&state_queue, &Flash_Highlighted_Square);
-        enqueue(&state_queue, &Flash_Movement_Indicator);
-        return_state = Selecting_Direction;
-        ChessApp_pfStateMachine = Draw_Board;
-    }
-    else if (WasButtonPressed(BUTTON1)) {
-        ButtonAcknowledge(BUTTON1);
-        set_menu_parts_drawn(0);
-        set_puzzle_mode(TRUE);
-        reset_app_data();
-        reset_game_data();
-        enqueue(&state_queue, &Flash_Highlighted_Square);
-        enqueue(&state_queue, &Flash_Movement_Indicator);
-        return_state = Selecting_Direction;
-        ChessApp_pfStateMachine = Draw_Board;
+static void Draw_Menu(void) {
+    interface_draw_timer--;
+    if (interface_draw_timer == 0) {
+        interface_draw_timer = INTERFACE_DRAW_TIMER_MAX;
+        if (get_menu_parts_drawn() != MENU_PARTS) {
+            draw_menu();
+        }
+        else {
+            set_menu_parts_drawn(0);
+            ChessApp_pfStateMachine = Main_Menu;
+        }
     }
 }
 
 /***************************************** Interface ********************************************/
 static void Draw_Board(void) {
-    if (get_board_parts_drawn() != BOARD_PARTS) {
-        draw_board();
-    }
-    else {
-        set_board_parts_drawn(0);
-        ChessApp_pfStateMachine = Draw_Interface;
+    interface_draw_timer--;
+    if (interface_draw_timer == 0) {
+        interface_draw_timer = INTERFACE_DRAW_TIMER_MAX;
+        if (get_board_parts_drawn() != BOARD_PARTS) {
+            draw_board();
+        }
+        else {
+            set_board_parts_drawn(0);
+            ChessApp_pfStateMachine = Draw_Interface;
+        }
     }
 }
 
 static void Draw_Interface(void) {
-    if (get_interface_parts_drawn() != INTERFACE_PARTS) {
-        draw_game_interface();
-    }
-    else {
-        set_interface_parts_drawn(0);
-        ChessApp_pfStateMachine = return_state;
+    interface_draw_timer--;
+    if (interface_draw_timer == 0) {
+        interface_draw_timer = INTERFACE_DRAW_TIMER_MAX;
+        if (get_interface_parts_drawn() != INTERFACE_PARTS) {
+            draw_game_interface();
+        }
+        else {
+            set_interface_parts_drawn(0);
+            ChessApp_pfStateMachine = return_state;
+        }
     }
 }
 
@@ -829,6 +824,29 @@ static void Close_Movement_Direction_Menu(void) {
 /************************************************************************************************/
 /****************************************** Menus ***********************************************/
 /************************************************************************************************/
+static void Main_Menu(void) {
+    if (WasButtonPressed(BUTTON0)) {
+        ButtonAcknowledge(BUTTON0);
+        set_puzzle_mode(FALSE);
+        reset_app_data();
+        reset_game_data();
+        enqueue(&state_queue, &Flash_Highlighted_Square);
+        enqueue(&state_queue, &Flash_Movement_Indicator);
+        return_state = Selecting_Direction;
+        ChessApp_pfStateMachine = Draw_Board;
+    }
+    else if (WasButtonPressed(BUTTON1)) {
+        ButtonAcknowledge(BUTTON1);
+        set_puzzle_mode(TRUE);
+        reset_app_data();
+        reset_game_data();
+        enqueue(&state_queue, &Flash_Highlighted_Square);
+        enqueue(&state_queue, &Flash_Movement_Indicator);
+        return_state = Selecting_Direction;
+        ChessApp_pfStateMachine = Draw_Board;
+    }
+}
+
 static void Selecting_Square(void) {
     if (debug && !controls_locked) {
         debug_timer--;

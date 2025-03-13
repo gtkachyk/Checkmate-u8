@@ -12,6 +12,8 @@ static const u8* piece_sprites[13] = {
 static uint8_t menu_parts_drawn = 0;
 static uint8_t board_parts_drawn = 0;
 static uint8_t interface_parts_drawn = 0;
+static uint8_t i = 0;
+static uint8_t j = 0;
 
 uint8_t get_menu_parts_drawn() {
     return menu_parts_drawn;
@@ -63,29 +65,23 @@ void draw_line(int start_row, int start_col, int length, int row_increment, int 
     }
 }
 
-void colour_square(int square_row, int square_col) {
-    for (int i = 0; i < SQUARE_PIXEL_SIZE; i++) {
-        int row = square_row + (i * DISPLAY_ROW_DIRECTION);
-        draw_line(row, square_col, SQUARE_PIXEL_SIZE, 0, DISPLAY_COL_DIRECTION);
-    }
-}
-
 void draw_pieces() {
-    for (int rank = 0; rank < BOARD_SIZE; rank++) {
-        for (int file = 0; file < BOARD_SIZE; file++) {
-            draw_piece(get_square_content(file, rank), rank, file);
+    while (i < BOARD_SIZE) {
+        while (j < BOARD_SIZE) {
+            draw_piece(get_square_content(j, i), i, j);
+            j++;
         }
+        i++;
+        j = 0;
+        return;
     }
+    i = 0;
+    j = 0;
 }
 
 void draw_board() {
     if (board_parts_drawn == 0) {
         LcdClearScreen();
-        board_parts_drawn++;
-        return;
-    }
-
-    if (board_parts_drawn == 1) {
         int board_pixel_dimensions = (SQUARE_PIXEL_SIZE * BOARD_SIZE) + 1;
         int outer_board_dimensions = board_pixel_dimensions + 1;
         int top_row = BOARD_BOTTOM_LEFT_PIXEL_ROW + (BOARD_SIZE * SQUARE_PIXEL_SIZE * DISPLAY_ROW_DIRECTION) + DISPLAY_ROW_DIRECTION;
@@ -98,30 +94,16 @@ void draw_board() {
         draw_line(bottom_row, left_col, outer_board_dimensions, 0, DISPLAY_COL_DIRECTION); // Bottom border
         draw_line(bottom_row, left_col, outer_board_dimensions, DISPLAY_ROW_DIRECTION, 0); // Left border
         draw_line(bottom_row, right_col + (1 * DISPLAY_ROW_DIRECTION), outer_board_dimensions, DISPLAY_ROW_DIRECTION, 0); // Right border
-
         board_parts_drawn++;
         return;
     }
 
-    if (board_parts_drawn == 2) {
-        // Colour squares
-        for (int row = 0; row < BOARD_SIZE; row++) {
-            for (int col = 0; col < BOARD_SIZE; col++) {
-                if ((row + col) % 2 != 1) {
-                    int square_row = BOARD_BOTTOM_LEFT_PIXEL_ROW + (row * SQUARE_PIXEL_SIZE * DISPLAY_ROW_DIRECTION);
-                    int square_col = BOARD_BOTTOM_LEFT_PIXEL_COL + (col * SQUARE_PIXEL_SIZE * DISPLAY_COL_DIRECTION);
-                    colour_square(square_row, square_col);
-                }
-            }
-        }
-        board_parts_drawn++;
-        return;
-    }
-
-    if (board_parts_drawn == 3) {
+    if (board_parts_drawn == 1) {
         // Draw pieces
         draw_pieces();
-        board_parts_drawn++;
+        if (i == 0 && j == 0) {
+            board_parts_drawn++;
+        }
         return;
     }
 }

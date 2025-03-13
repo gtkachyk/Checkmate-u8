@@ -72,7 +72,7 @@ void ChessAppRunActiveState(void);
 /*--------------------------------------------------------------------------------------------------------------------*/
 
 /* State Machine Declarations */
-static void Chess_Menu(void);
+static void Main_Menu(void);
 static void Selecting_Direction(void);
 static void Selecting_Square(void);
 static void Lift_Piece(void);
@@ -103,6 +103,7 @@ static void Setup_Post_Move_Analysis(void);
 static void Post_Move_Check_Is_Draw_By_Fifty_Move_Rule(void);
 static void Draw_Board(void);
 static void Draw_Interface(void);
+static void Draw_Menu(void);
 bool get_skip_reset();
 
 /* chess_utils.c */
@@ -134,7 +135,6 @@ void draw_turn_symbol();
 void draw_movement_symbol();
 void draw_menu();
 void draw_line(int start_row, int start_col, int length, int row_increment, int col_increment);
-void colour_square(int square_row, int square_col);
 void draw_selected_square_indicator(Square square);
 void draw_piece(uint8_t piece, uint8_t rank, uint8_t file);
 void highlight_square(Square square, uint8_t content, bool highlight_selected);
@@ -240,6 +240,7 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 #define DISPLAY_ROW_DIRECTION (int8_t)-1
 #define DISPLAY_COL_DIRECTION (u8)1
 #define QUEUE_TIMER_MAX 250
+#define INTERFACE_DRAW_TIMER_MAX 50
 #define PLAYER_SYMBOL_START_COL (u8)5
 #define WHITE_PLAYER_SYMBOL_WIDTH (u8)23
 #define BLACK_PLAYER_SYMBOL_WIDTH (u8)25
@@ -298,7 +299,7 @@ Move create_move(int8_t start_col, int8_t start_row, int8_t end_col, int8_t end_
 #define DEBUG_TIMER_MAX 500
 #define UNDEFINED_COLOUR (uint8_t)2
 #define MENU_PARTS (uint8_t)6
-#define BOARD_PARTS (uint8_t)4
+#define BOARD_PARTS (uint8_t)2
 #define INTERFACE_PARTS (uint8_t)5
 
 /* Bitmaps */
