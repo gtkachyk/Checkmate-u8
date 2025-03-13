@@ -788,7 +788,15 @@ static void Post_Move_Check_Has_Valid_Move(void) {
         }
 
         // Game ends
-        get_king_in_check() ? end_game(RESULT_CHECKMATE) : end_game(RESULT_DRAW);
+        if (get_king_in_check()) {
+            end_game(RESULT_CHECKMATE);
+        }
+        else if (get_puzzle_mode()) {
+            end_game(RESULT_PUZZLE_FAILED);
+        }
+        else {
+            end_game(RESULT_DRAW);
+        }
         return;
     }
 
